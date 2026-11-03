@@ -5,6 +5,75 @@ import AppKit
 import Foundation
 
 extension WMController {
+    func captureFocusFollowsMouseFloatingStack(for request: ManagedFocusRequest, entry: WindowState) {
+        guard request.origin == .focusFollowsMouse,
+              entry.mode == .tiling,
+              let targetWindowId = UInt32(exactly: entry.windowId)
+        else {
+            focusFollowsMouseFloatingStack = nil
+            return
+        }
+        if focusFollowsMouseFloatingStack?.requestId == request.requestId { return }
+        focusFollowsMouseFloatingStack = nil
+
+        var candidatesByWindowId: [UInt32: WindowToken] = [:]
+        for workspaceId in workspaceManager.visibleWorkspaceIds() {
+            for floatingEntry in workspaceManager.floatingEntries(in: workspaceId)
+                where workspaceManager.isFloatingWindowDisplayable(floatingEntry)
+            {
+                if let windowId = UInt32(exactly: floatingEntry.windowId) {
+                    candidatesByWindowId[windowId] = floatingEntry.token
+                }
+            }
+        }
+
+        let candidates = Set(candidatesByWindowId.keys)
+        let overlapping = candidates.isEmpty
+            ? []
+            : windowFocusOperations.overlappingWindowIdsAbove(targetWindowId, candidates) ?? []
+        focusFollowsMouseFloatingStack = (
+            requestId: request.requestId,
+            target: entry.token,
+            windows: overlapping.compactMap { candidatesByWindowId[$0] }
+        )
+    }
+
+    func restoreFocusFollowsMouseFloatingStack(for request: ManagedFocusRequest) {
+        guard let snapshot = focusFollowsMouseFloatingStack,
+              snapshot.requestId == request.requestId
+        else {
+            return
+        }
+        focusFollowsMouseFloatingStack = nil
+        guard request.status == .confirmed,
+              request.origin == .focusFollowsMouse,
+              request.token == snapshot.target,
+              intentLedger.activeManagedRequest == nil,
+              workspaceManager.nativeManagedFocusToken == request.token,
+              !hasFrontmostOwnedWindow,
+              focusPolicyEngine.evaluate(.windowFronting).allowsFocusChange
+        else {
+            return
+        }
+
+        let visibleWorkspaceIds = workspaceManager.visibleWorkspaceIds()
+        let windows = snapshot.windows.compactMap { token -> WindowState? in
+            guard let entry = workspaceManager.entry(for: token),
+                  entry.token == token,
+                  visibleWorkspaceIds.contains(entry.workspaceId),
+                  workspaceManager.isFloatingWindowDisplayable(entry),
+                  let windowId = UInt32(exactly: entry.windowId),
+                  windowFocusOperations.isWindowOrderedIn(windowId) == true
+            else {
+                return nil
+            }
+            return entry
+        }
+        for entry in windows.reversed() {
+            performWindowOrdering(windowId: entry.windowId)
+        }
+    }
+
     func shouldRaiseManagedFocus(origin: ManagedFocusOrigin, entry: borrowing WindowState) -> Bool {
         guard origin == .focusFollowsMouse else { return true }
         guard settings.focus.raiseOnMouseFocus else { return false }

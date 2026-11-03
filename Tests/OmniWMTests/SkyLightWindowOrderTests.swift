@@ -10,10 +10,15 @@ final class SkyLightWindowOrderTests: XCTestCase {
     func testCoverageRequiresEligibleWindowAboveTargetWithPartialOverlap() {
         let target = windowInfo(id: 100, frame: CGRect(x: 8, y: 38, width: 1424, height: 854))
         let floating = windowInfo(id: 101, frame: CGRect(x: 258, y: 0, width: 740, height: 900))
+        let secondFloating = windowInfo(id: 103, frame: CGRect(x: 300, y: 40, width: 500, height: 700))
         let distant = windowInfo(id: 101, frame: CGRect(x: 1600, y: 38, width: 200, height: 200))
         let edge = windowInfo(id: 101, frame: CGRect(x: 1428, y: 38, width: 200, height: 200))
 
         XCTAssertEqual(SkyLight.hasOverlappingWindowsAbove(100, among: [101], in: [floating, target]), true)
+        XCTAssertEqual(
+            SkyLight.overlappingWindowIdsAbove(100, among: [101, 103], in: [floating, secondFloating, target]),
+            [101, 103]
+        )
         XCTAssertEqual(SkyLight.hasOverlappingWindowsAbove(100, among: [101], in: [target, floating]), false)
         XCTAssertEqual(SkyLight.hasOverlappingWindowsAbove(100, among: [102], in: [floating, target]), false)
         XCTAssertEqual(SkyLight.hasOverlappingWindowsAbove(100, among: [101], in: [distant, target]), false)

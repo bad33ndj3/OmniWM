@@ -41,6 +41,13 @@ extension ActionCatalog {
                 binding: KeyBinding(keyCode: UInt32(kVK_ANSI_M), modifiers: UInt32(controlKey | optionKey)),
                 keywords: ["menu", "anywhere"]
             ),
+            action(
+                id: "openPersonalDashboard",
+                command: .openPersonalDashboard,
+                category: .focus,
+                binding: .unassigned,
+                keywords: ["dashboard", "workspace", "werkruimte"]
+            ),
             setWindowMarkActionSpec,
             removeWindowMarkActionSpec,
             IPCPresentationCommand.workspaceBar.actionSpec(),

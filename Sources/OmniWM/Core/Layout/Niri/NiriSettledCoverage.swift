@@ -33,8 +33,18 @@ enum NiriMonitorPlaneGeometry {
         viewportFrame: CGRect,
         orientation: Monitor.Orientation,
         hiddenPlacementMonitor: HiddenPlacementMonitorContext?,
-        hiddenPlacementMonitors: [HiddenPlacementMonitorContext]
+        hiddenPlacementMonitors: [HiddenPlacementMonitorContext],
+        unclampedRect: CGRect? = nil
     ) -> AxisHideEdge? {
+        // Keep horizontal edge previews visible; OmniWM requires separate display Spaces.
+        let visibilityRect = unclampedRect ?? renderedRect
+        if orientation == .horizontal,
+           visibilityRect.maxX > viewportFrame.minX,
+           visibilityRect.minX < viewportFrame.maxX
+        {
+            return nil
+        }
+
         let (minimumOverflow, maximumOverflow) = overflowRects(
             of: renderedRect,
             beyond: viewportFrame,

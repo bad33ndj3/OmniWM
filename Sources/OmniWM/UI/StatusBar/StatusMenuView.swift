@@ -192,6 +192,9 @@ struct StatusMenuPrimaryView: View {
                     model.showHiddenIcons()
                 }
             }
+            MenuActionRow(icon: "rectangle.3.group", label: "Werkruimte") {
+                model.openPersonalDashboard()
+            }
             MenuActionRow(icon: "gearshape", label: String(localized: "Settings")) {
                 model.openSettings()
             }

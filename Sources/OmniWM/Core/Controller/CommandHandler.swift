@@ -99,6 +99,8 @@ final class CommandHandler {
         case let .scratchpad(action): return perform(action, controller: controller)
         case .openMenuAnywhere:
             controller.openMenuAnywhere()
+        case .openPersonalDashboard:
+            controller.personalDashboardController.toggle()
         case let .windowMark(action):
             return performWindowMarkAction(action, for: controller.workspaceManager.nativeManagedFocusToken)
         case let .presentation(action): return perform(action, controller: controller)

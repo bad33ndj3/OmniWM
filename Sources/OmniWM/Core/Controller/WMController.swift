@@ -52,6 +52,7 @@ final class WMController {
             workspaceBarManager.setShellLocked(isLockScreenActive)
             publishPointerEdgeTopology()
             if isLockScreenActive {
+                niriMinimapController.removeAll()
                 windowSwitcherControllerStorage?.dismiss()
                 hotkeys.cancelArmedKeyboardMode()
                 layoutRefreshController.suspendForLockScreen()
@@ -62,6 +63,9 @@ final class WMController {
             }
         }
     }
+
+    @ObservationIgnored
+    private(set) lazy var niriMinimapController = NiriMinimapController(controller: self)
 
     let axManager = AXManager()
     @ObservationIgnored
@@ -83,6 +87,8 @@ final class WMController {
     let eventIntake = EventIntake()
     let factResolver = FactResolver()
     let intentLedger = IntentLedger()
+    @ObservationIgnored
+    var focusFollowsMouseFloatingStack: (requestId: IntentID, target: WindowToken, windows: [WindowToken])?
     let deadlineWheel = DeadlineWheel()
     @ObservationIgnored
     private(set) lazy var scratchpadStacking = ScratchpadStackingController(controller: self)
@@ -194,6 +200,8 @@ final class WMController {
 
     @ObservationIgnored
     private(set) lazy var commandPaletteController: CommandPaletteController = .init(motionPolicy: motionPolicy)
+    @ObservationIgnored
+    private(set) lazy var personalDashboardController = PersonalDashboardController(controller: self)
     @ObservationIgnored var windowSwitcherControllerStorage: WindowSwitcherController?
     var windowSwitcherController: WindowSwitcherController {
         if let windowSwitcherControllerStorage { return windowSwitcherControllerStorage }

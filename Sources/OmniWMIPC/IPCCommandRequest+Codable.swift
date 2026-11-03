@@ -43,7 +43,8 @@ extension IPCCommandRequest: Codable {
              .media,
              .keyboardMode,
              .windowState,
-             .openMenuAnywhere:
+             .openMenuAnywhere,
+             .openPersonalDashboard:
             break
         }
     }

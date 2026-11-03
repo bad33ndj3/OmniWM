@@ -70,6 +70,16 @@ private struct GlobalNiriSettingsSection: View {
         let presets = settings.niri.containerPrimarySpanPresets
 
         Section("Niri Layout") {
+            Picker("Minimap", selection: Bindable(settings.niri).minimapVisibility) {
+                Text("Off").tag(NiriMinimapVisibility.off)
+                Text("While Navigating").tag(NiriMinimapVisibility.whileNavigating)
+                Text("Always").tag(NiriMinimapVisibility.always)
+            }
+            .help("A translucent window map in the top-right corner. Click a window to reveal it.")
+            .onChange(of: settings.niri.minimapVisibility) { _, _ in
+                controller.surfaceReconciler.noteWorldChanged()
+            }
+
             SettingsSliderRow(
                 label: String(localized: "Visible Containers"),
                 value: Binding(

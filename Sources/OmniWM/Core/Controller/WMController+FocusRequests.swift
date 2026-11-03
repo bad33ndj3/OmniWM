@@ -20,6 +20,7 @@ extension WMController {
             entry, origin: origin, defersRetryRaise: defersRetryRaise,
             requiresWorkerRaise: requiresWorkerRaise
         )
+        captureFocusFollowsMouseFloatingStack(for: request, entry: entry)
 
         let applied = applyManagedFocusRequest(
             request,

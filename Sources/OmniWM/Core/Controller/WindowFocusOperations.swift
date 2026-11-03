@@ -16,6 +16,8 @@ struct WindowFocusOperations {
     let raiseWindow: (AXUIElement) -> Void
     let orderWindow: (UInt32) -> Void
     let hasOverlappingWindowsAbove: (UInt32, Set<UInt32>) -> Bool?
+    let overlappingWindowIdsAbove: (UInt32, Set<UInt32>) -> [UInt32]?
+    let isWindowOrderedIn: (UInt32) -> Bool?
     let enqueueRetryRaise: (pid_t, AXWindowRef, RunLoopJob, @escaping @MainActor @Sendable () -> Void) -> Bool
 
     init(
@@ -28,6 +30,8 @@ struct WindowFocusOperations {
         raiseWindow: @escaping (AXUIElement) -> Void,
         orderWindow: @escaping (UInt32) -> Void = { _ in },
         hasOverlappingWindowsAbove: @escaping (UInt32, Set<UInt32>) -> Bool? = { _, _ in nil },
+        overlappingWindowIdsAbove: @escaping (UInt32, Set<UInt32>) -> [UInt32]? = { _, _ in nil },
+        isWindowOrderedIn: @escaping (UInt32) -> Bool? = { _ in nil },
         enqueueRetryRaise: @escaping (
             pid_t, AXWindowRef, RunLoopJob, @escaping @MainActor @Sendable () -> Void
         ) -> Bool = { pid, window, job, completion in
@@ -49,6 +53,8 @@ struct WindowFocusOperations {
         self.raiseWindow = raiseWindow
         self.orderWindow = orderWindow
         self.hasOverlappingWindowsAbove = hasOverlappingWindowsAbove
+        self.overlappingWindowIdsAbove = overlappingWindowIdsAbove
+        self.isWindowOrderedIn = isWindowOrderedIn
         self.enqueueRetryRaise = enqueueRetryRaise
     }
 
@@ -101,6 +107,10 @@ struct WindowFocusOperations {
         },
         hasOverlappingWindowsAbove: { windowId, candidates in
             SkyLight.shared.hasOverlappingWindowsAbove(windowId, among: candidates)
-        }
+        },
+        overlappingWindowIdsAbove: { windowId, candidates in
+            SkyLight.shared.overlappingWindowIdsAbove(windowId, among: candidates)
+        },
+        isWindowOrderedIn: { SkyLight.shared.isWindowOrderedIn($0) }
     )
 }

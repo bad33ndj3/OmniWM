@@ -32,12 +32,15 @@ Frameworks/
 # Codex
 .codex-home/
 .claude/
-/.agents/
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/personal-wm-test/
 .tmp/
 .cache/
 .codex-cache/
-/AGENTS.md
 /CLAUDE.md
 
 # Local documentation
 STABILITY_IMPROVEMENTS.md
+/HANDOFF.md

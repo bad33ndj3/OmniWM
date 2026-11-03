@@ -352,10 +352,10 @@ final class NiriScrollVisibilityTests: XCTestCase {
         )
     }
 
-    func testHorizontalNeighborOverflowStaysHiddenWhileOpenEdgesRemainVisible() throws {
-        let scenarios: [(neighborX: CGFloat, liveOffset: CGFloat, side: HideSide)] = [
-            (1_000, -200, .right),
-            (-1_000, 200, .left)
+    func testHorizontalPartialOverflowRemainsVisibleAtNeighborAndOpenEdges() throws {
+        let scenarios: [(neighborX: CGFloat, liveOffset: CGFloat)] = [
+            (1_000, -1), (1_000, -200), (1_000, -999),
+            (-1_000, 1), (-1_000, 200), (-1_000, 999)
         ]
 
         for scenario in scenarios {
@@ -364,10 +364,7 @@ final class NiriScrollVisibilityTests: XCTestCase {
                 neighboringFixture,
                 liveOffset: scenario.liveOffset
             )
-            XCTAssertEqual(
-                neighboringLayout.hiddenHandles[neighboringFixture.tokens[0]],
-                scenario.side
-            )
+            XCTAssertNil(neighboringLayout.hiddenHandles[neighboringFixture.tokens[0]])
 
             let openFixture = makeHorizontalNeighborFixture(neighborX: nil)
             let openLayout = horizontalNeighborLayout(

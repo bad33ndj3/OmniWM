@@ -11,7 +11,6 @@ private enum MonitorSelectionMode {
 private struct MonitorSelectionRank {
     let primary: CGFloat
     let secondary: CGFloat
-    let distance: CGFloat?
 }
 
 extension WorkspaceManager {
@@ -133,15 +132,28 @@ extension WorkspaceManager {
         let directional = others.filter { candidate in
             let delta = monitorDelta(from: current, to: candidate)
             switch direction {
-            case .left: return delta.dx < 0 && abs(delta.dx) >= abs(delta.dy)
-            case .right: return delta.dx > 0 && abs(delta.dx) >= abs(delta.dy)
-            case .up: return delta.dy > 0 && abs(delta.dy) >= abs(delta.dx)
-            case .down: return delta.dy < 0 && abs(delta.dy) >= abs(delta.dx)
+            case .left: return delta.dx < 0
+            case .right: return delta.dx > 0
+            case .up: return delta.dy > 0
+            case .down: return delta.dy < 0
             }
         }
 
-        if let bestDirectional = bestMonitor(in: directional, from: current, direction: direction) {
-            return bestDirectional
+        let overlapping = directional.filter {
+            monitorOrthogonalOverlap(from: current, to: $0, direction: direction) > 0
+        }
+        if !overlapping.isEmpty {
+            return bestMonitor(in: overlapping, from: current, direction: direction)
+        }
+        if let closest = directional.min(by: {
+            let lhsDistance = monitorDistanceSquared(from: current, to: $0)
+            let rhsDistance = monitorDistanceSquared(from: current, to: $1)
+            if lhsDistance != rhsDistance {
+                return lhsDistance < rhsDistance
+            }
+            return MonitorRestoreOrder(monitor: $0) < MonitorRestoreOrder(monitor: $1)
+        }) {
+            return closest
         }
 
         guard wrapAround else { return nil }
@@ -183,12 +195,6 @@ extension WorkspaceManager {
         if lhsRank.secondary != rhsRank.secondary {
             return lhsRank.secondary < rhsRank.secondary
         }
-        if let lhsDistance = lhsRank.distance,
-           let rhsDistance = rhsRank.distance,
-           lhsDistance != rhsDistance
-        {
-            return lhsDistance < rhsDistance
-        }
         return MonitorRestoreOrder(monitor: lhs) < MonitorRestoreOrder(monitor: rhs)
     }
 
@@ -206,28 +212,26 @@ extension WorkspaceManager {
             case .left,
                  .right:
                 return MonitorSelectionRank(
-                    primary: abs(delta.dx),
-                    secondary: abs(delta.dy),
-                    distance: monitorDistanceSquared(from: candidate, to: current)
+                    primary: monitorDirectionalGap(from: current, to: candidate, direction: direction),
+                    secondary: abs(delta.dy)
                 )
             case .up,
                  .down:
                 return MonitorSelectionRank(
-                    primary: abs(delta.dy),
-                    secondary: abs(delta.dx),
-                    distance: monitorDistanceSquared(from: candidate, to: current)
+                    primary: monitorDirectionalGap(from: current, to: candidate, direction: direction),
+                    secondary: abs(delta.dx)
                 )
             }
         case .wrapped:
             switch direction {
             case .right:
-                return MonitorSelectionRank(primary: candidate.frame.center.x, secondary: abs(delta.dy), distance: nil)
+                return MonitorSelectionRank(primary: candidate.frame.center.x, secondary: abs(delta.dy))
             case .left:
-                return MonitorSelectionRank(primary: -candidate.frame.center.x, secondary: abs(delta.dy), distance: nil)
+                return MonitorSelectionRank(primary: -candidate.frame.center.x, secondary: abs(delta.dy))
             case .up:
-                return MonitorSelectionRank(primary: candidate.frame.center.y, secondary: abs(delta.dx), distance: nil)
+                return MonitorSelectionRank(primary: candidate.frame.center.y, secondary: abs(delta.dx))
             case .down:
-                return MonitorSelectionRank(primary: -candidate.frame.center.y, secondary: abs(delta.dx), distance: nil)
+                return MonitorSelectionRank(primary: -candidate.frame.center.y, secondary: abs(delta.dx))
             }
         }
     }
@@ -235,5 +239,25 @@ extension WorkspaceManager {
     private func monitorDistanceSquared(from source: Monitor, to target: Monitor) -> CGFloat {
         let delta = monitorDelta(from: source, to: target)
         return delta.dx * delta.dx + delta.dy * delta.dy
+    }
+
+    private func monitorOrthogonalOverlap(from source: Monitor, to target: Monitor, direction: Direction) -> CGFloat {
+        switch direction {
+        case .left,
+             .right:
+            min(source.frame.maxY, target.frame.maxY) - max(source.frame.minY, target.frame.minY)
+        case .up,
+             .down:
+            min(source.frame.maxX, target.frame.maxX) - max(source.frame.minX, target.frame.minX)
+        }
+    }
+
+    private func monitorDirectionalGap(from source: Monitor, to target: Monitor, direction: Direction) -> CGFloat {
+        switch direction {
+        case .left: max(0, source.frame.minX - target.frame.maxX)
+        case .right: max(0, target.frame.minX - source.frame.maxX)
+        case .up: max(0, target.frame.minY - source.frame.maxY)
+        case .down: max(0, source.frame.minY - target.frame.maxY)
+        }
     }
 }

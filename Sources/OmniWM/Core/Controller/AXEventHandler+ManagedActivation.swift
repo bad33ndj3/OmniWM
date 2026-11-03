@@ -61,6 +61,9 @@ extension AXEventHandler {
         ) else { return }
 
         applyManagedActivationOrdering(observation, controller: controller)
+        if let confirmedRequest = confirmedManagedRequest {
+            controller.restoreFocusFollowsMouseFloatingStack(for: confirmedRequest)
+        }
         let preferredMouseFrame = activateManagedLayoutTarget(observation, controller: controller)
         finishManagedActivation(
             observation,

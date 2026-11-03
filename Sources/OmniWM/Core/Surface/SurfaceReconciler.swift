@@ -101,6 +101,7 @@ final class SurfaceReconciler {
         reconcileScheduled = false
         forceOrderingOnNextReconcile = false
         pendingReconcileScope = nil
+        controller?.niriMinimapController.update()
         switch scope {
         case .borderOnly:
             runBorderReconcile(forceOrdering: forceOrdering)
@@ -113,6 +114,7 @@ final class SurfaceReconciler {
     }
 
     func reconcileAnimationTick() {
+        controller?.niriMinimapController.updateForAnimation()
         guard let controller, controller.settings.borders.enabled else { return }
         let world = WorldView(controller: controller)
         let desiredBorder = world.hasStartedServices
@@ -207,6 +209,7 @@ final class SurfaceReconciler {
     }
 
     func cleanup() {
+        controller?.niriMinimapController.removeAll()
         reconcileScheduled = false
         forceOrderingOnNextReconcile = false
         pendingReconcileScope = nil

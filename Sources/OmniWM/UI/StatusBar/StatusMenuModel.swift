@@ -201,6 +201,10 @@ final class StatusMenuModel {
         return tiles
     }
 
+    func openPersonalDashboard() {
+        controller?.personalDashboardController.show()
+    }
+
     func openSettings(section: SettingsSection? = nil) {
         guard let controller else { return }
         SettingsWindowController.shared.show(

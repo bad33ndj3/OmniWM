@@ -52,6 +52,8 @@ extension IPCCommandRequest {
             self = try arguments.requireNoArguments(.openMenuAnywhere)
         case .shellAppOpen:
             self = try .shellAppOpen(appID: arguments.appID())
+        case .openPersonalDashboard:
+            self = try arguments.requireNoArguments(.openPersonalDashboard)
         }
     }
 }

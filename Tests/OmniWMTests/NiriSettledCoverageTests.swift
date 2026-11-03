@@ -80,7 +80,7 @@ final class NiriSettledCoverageTests: NiriInteractionTestCase {
         XCTAssertEqual(recovered, -16, accuracy: 0.001)
     }
 
-    func testHorizontalNeighborUsesTheSameAxisGenericRecovery() {
+    func testHorizontalNeighborPreservesOffsetWithPartiallyVisibleColumns() {
         let horizontalSourceFrame = CGRect(x: 0, y: 0, width: 2_560, height: 1_440)
         let horizontalWorkingFrame = CGRect(x: 16, y: 16, width: 2_498, height: 1_408)
         let source = monitorContext(displayId: 20, frame: horizontalSourceFrame)
@@ -104,7 +104,7 @@ final class NiriSettledCoverageTests: NiriInteractionTestCase {
             )
         )
 
-        XCTAssertEqual(recovered, -1_241, accuracy: 0.001)
+        XCTAssertEqual(recovered, -16, accuracy: 0.001)
     }
 
     func testOnePhysicalPixelGainStaysAndTwoPixelGainMoves() {

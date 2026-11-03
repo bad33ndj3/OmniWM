@@ -421,6 +421,10 @@ extension IPCAutomationManifest {
             summary: "Open the menu surface anywhere."
         ),
         .init(
+            name: .openPersonalDashboard,
+            summary: "Open the workspace dashboard."
+        ),
+        .init(
             name: .presentation(.workspaceBar),
             summary: "Toggle runtime workspace bar visibility."
         ),

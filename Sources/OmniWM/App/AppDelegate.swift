@@ -82,6 +82,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         bootstrapApplication()
     }
 
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard let controller = AppDelegate.sharedBootstrap?.controller else { return true }
+        controller.personalDashboardController.show()
+        return false
+    }
+
     public func applicationWillTerminate(_: Notification) {
         settingsConfigNoticeController = nil
         statusBarController?.cleanup()

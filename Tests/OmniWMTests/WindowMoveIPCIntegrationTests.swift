@@ -22,6 +22,47 @@ final class WindowMoveIPCIntegrationTests: XCTestCase {
         let focusRecorder: FocusRecorder
     }
 
+    func testDashboardTransferRetainsSourceEvenWhenFollowingIsConfigured() throws {
+        let fixture = try makeFixture(followsFocus: true)
+        let fallback = try addManagedWindow(pid: 489_010, windowId: 91, to: fixture.workspaceIds[0], fixture: fixture)
+        let moved = try addManagedWindow(pid: 489_010, windowId: 92, to: fixture.workspaceIds[0], fixture: fixture)
+        try select(moved, in: fixture.workspaceIds[0], fixture: fixture)
+        try withBlockedLayoutRefreshes(fixture) {
+            XCTAssertTrue(PersonalDashboardController.transfer(
+                moved.id, to: fixture.workspaceIds[1], fallback: fallback.id, controller: fixture.controller
+            ))
+            XCTAssertEqual(fixture.controller.workspaceManager.workspace(for: moved.id), fixture.workspaceIds[1])
+            XCTAssertEqual(
+                fixture.controller.workspaceManager.lastFocusedToken(in: fixture.workspaceIds[0]),
+                fallback.id
+            )
+            XCTAssertEqual(
+                fixture.controller.workspaceManager.activeWorkspace(on: fixture.monitor.id)?.id,
+                fixture.workspaceIds[0]
+            )
+            XCTAssertTrue(fixture.focusRecorder.focusedTokens.isEmpty)
+            let pending = try XCTUnwrap(fixture.controller.layoutRefreshController.layoutState.pendingRefresh)
+            XCTAssertTrue(pending.postLayoutActions.isEmpty)
+        }
+    }
+
+    func testDashboardTransferLeavesAnEmptySourceSelected() throws {
+        let fixture = try makeFixture(followsFocus: true)
+        let moved = try addManagedWindow(pid: 489_011, windowId: 93, to: fixture.workspaceIds[0], fixture: fixture)
+        try select(moved, in: fixture.workspaceIds[0], fixture: fixture)
+        try withBlockedLayoutRefreshes(fixture) {
+            XCTAssertTrue(PersonalDashboardController.transfer(
+                moved.id, to: fixture.workspaceIds[1], fallback: nil, controller: fixture.controller
+            ))
+            XCTAssertNil(fixture.controller.workspaceManager.lastFocusedToken(in: fixture.workspaceIds[0]))
+            XCTAssertEqual(
+                fixture.controller.workspaceManager.activeWorkspace(on: fixture.monitor.id)?.id,
+                fixture.workspaceIds[0]
+            )
+            XCTAssertTrue(fixture.focusRecorder.focusedTokens.isEmpty)
+        }
+    }
+
     func testMoveUnfocusedWindowKeepsFocusAndActiveWorkspace() throws {
         let fixture = try makeFixture(followsFocus: true)
         let focused = try addManagedWindow(pid: 489_001, windowId: 1, to: fixture.workspaceIds[0], fixture: fixture)

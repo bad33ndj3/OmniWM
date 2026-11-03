@@ -93,6 +93,10 @@ final class NiriSettings {
         min(100, max(1, percent))
     }
 
+    var minimapVisibility = NiriSettings.defaults.minimapVisibility ?? .off {
+        didSet { onChange?() }
+    }
+
     var monitorOverrides: [MonitorNiriSettings] = [] {
         didSet { onChange?() }
     }
@@ -110,11 +114,13 @@ final class NiriSettings {
             resizeStepPercent: resizeStepPercent,
             moveWindowStacksIntoColumn: moveWindowStacksIntoColumn,
             allowOverscroll: allowOverscroll,
-            overscrollVisibleStripPercent: overscrollVisibleStripPercent
+            overscrollVisibleStripPercent: overscrollVisibleStripPercent,
+            minimapVisibility: minimapVisibility
         )
     }
 
     func apply(_ niri: SettingsExport.Niri, baseline: SettingsExport.Niri) {
+        minimapVisibility = niri.minimapVisibility ?? baseline.minimapVisibility ?? .off
         visibleContainerCount = niri.visibleContainerCount
         infiniteLoop = niri.infiniteLoop
         centerFocusedColumn = niri.centerFocusedColumn

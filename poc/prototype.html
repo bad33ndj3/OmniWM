@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Schermwerk — demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #eceeea;
+      --surface: #fafbf8;
+      --ink: #242d2a;
+      --muted: #66736e;
+      --line: #cbd3cd;
+      --teal: #27776a;
+      --teal-wash: #e4f0ec;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: var(--canvas); overflow-x: hidden; }
+    button, select { font: inherit; color: inherit; }
+    button, select { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+    button { min-height: 34px; padding: 6px 10px; cursor: pointer; }
+    button:hover { border-color: #8b9c94; }
+    button:focus-visible, select:focus-visible, [draggable="true"]:focus-visible {
+      outline: 2px solid var(--teal); outline-offset: 2px;
+    }
+    button[aria-pressed="true"], button.is-current {
+      border-color: var(--teal); color: var(--teal); background: var(--teal-wash);
+    }
+    .desk { width: min(100%, 1600px); margin: 0 auto; padding: 20px clamp(14px, 2.2vw, 32px) 26px; }
+    .topbar, .toolbar, .section-heading, .control-row, .dash-head, .dash-focus-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    }
+    .topbar { min-height: 54px; margin-bottom: 16px; }
+    .title-wrap { display: flex; align-items: baseline; gap: 12px; }
+    .eyebrow, .mono, .hint, .screen-id, .state-line, .app-subtitle, .step-note { font-family: var(--mono); }
+    .eyebrow { margin: 0; color: var(--muted); font-size: 11px; letter-spacing: .04em; }
+    h1 { margin: 0; font-size: clamp(19px, 2vw, 24px); font-weight: 600; letter-spacing: -.025em; }
+    h2, h3, p { margin-top: 0; }
+    h2 { margin-bottom: 0; font-size: 15px; font-weight: 600; }
+    h3 { margin: 0; font-size: 13px; font-weight: 600; }
+    .top-actions, .scenario-tabs, .toolbar-group, .preset-buttons, .directions, .reorder-actions {
+      display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+    }
+    .toolbar { padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #f3f5f1; }
+    .toolbar-group { gap: 9px; }
+    .field-label, .small-label { color: var(--muted); font-size: 12px; }
+    select { min-height: 34px; padding: 5px 30px 5px 9px; }
+    .scenario-tabs button { font-size: 12px; }
+    .scenario-tabs button[aria-pressed="true"] { font-weight: 600; }
+    .workspace { margin-top: 16px; }
+    .section-heading { min-height: 30px; margin-bottom: 8px; }
+    .section-meta { color: var(--muted); font-size: 12px; }
+    .map-viewport {
+      position: relative; height: clamp(340px, 52vh, 520px); overflow: hidden;
+      border: 1px solid var(--line); border-radius: 10px;
+      background-color: #e6e9e4;
+      background-image: radial-gradient(#d2d8d2 .7px, transparent .7px);
+      background-size: 14px 14px;
+    }
+    .screen-map { position: absolute; width: 1200px; height: 500px; transform-origin: top left; }
+    .monitor {
+      position: absolute; display: flex; flex-direction: column; padding: 11px;
+      border: 1px solid #9eaaa3; border-radius: 10px; background: #d8ddd8;
+      box-shadow: 0 2px 6px #242d2a12;
+    }
+    .monitor.is-current { border: 2px solid var(--teal); padding: 10px; }
+    .monitor-head { display: flex; align-items: center; justify-content: space-between; min-height: 29px; gap: 8px; }
+    .screen-select { min-height: 26px; padding: 3px 7px; border: 0; background: transparent; font-size: 13px; font-weight: 600; }
+    .screen-id { color: var(--muted); font-size: 10px; }
+    .screen-face { display: flex; flex: 1; flex-direction: column; min-height: 0; padding: 9px; border: 1px solid #b9c2bb; border-radius: 5px; background: var(--surface); }
+    .screen-strip-label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: var(--muted); font-size: 10px; }
+    .app-strip { display: flex; flex: 1; gap: 7px; min-height: 0; overflow-x: auto; overflow-y: hidden; padding: 1px 2px 6px; scrollbar-color: #aebbb3 transparent; scrollbar-width: thin; }
+    .app-card {
+      flex: 0 0 calc(var(--tile-size, 33.333%) - 5px); min-width: 104px; min-height: 85px;
+      display: flex; flex-direction: column; padding: 0; overflow: hidden;
+      border: 1px solid var(--line); border-radius: 6px; background: #f7f8f5; text-align: left;
+    }
+    .app-strip.is-vertical { flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+    .app-strip.is-vertical .app-card { flex-basis: calc(var(--tile-size, 33.333%) - 5px); width: 100%; min-width: 0; min-height: 70px; }
+    .app-strip.is-vertical .empty-strip { min-width: 0; min-height: 100%; }
+    .app-card.is-focused { outline: 2px solid var(--teal); outline-offset: -2px; border-color: var(--teal); }
+    .app-select { display: flex; flex: 1; flex-direction: column; align-items: flex-start; width: 100%; min-height: 0; padding: 9px; border: 0; border-radius: 0; background: transparent; text-align: left; }
+    .app-name { font-size: 12px; font-weight: 600; }
+    .app-subtitle { margin-top: 4px; color: var(--muted); font-size: 9px; }
+    .app-width { margin: auto 8px 7px; padding-top: 5px; border-top: 1px solid #e1e5e0; color: var(--muted); font: 9px var(--mono); }
+    .empty-strip { display: grid; flex: 1; place-items: center; min-width: 100%; color: var(--muted); font-size: 11px; }
+    .map-footer { display: flex; justify-content: space-between; margin-top: 5px; color: var(--muted); font: 9px var(--mono); }
+    .controls { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; align-items: center; gap: 14px; margin-top: 12px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+    .focus-summary { min-width: 0; }
+    .focus-title { margin-bottom: 3px; font-size: 13px; font-weight: 600; }
+    .state-line { margin: 0; color: var(--muted); font-size: 10px; }
+    .control-block { display: flex; flex-direction: column; gap: 6px; }
+    .control-block .small-label { font-size: 10px; }
+    .control-block button { min-height: 30px; padding: 4px 8px; font-size: 11px; }
+    .hint { color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .feedback { min-height: 23px; margin: 8px 2px 0; color: var(--muted); font-size: 12px; }
+    .feedback strong { color: var(--ink); font-weight: 500; }
+    .walkthrough { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+    .walkthrough h2 { color: var(--muted); font-size: 11px; }
+    .walkthrough-steps { display: flex; gap: 6px; flex-wrap: wrap; }
+    .walkthrough-steps button { min-height: 29px; padding: 4px 8px; font-size: 10px; }
+    .walkthrough-steps button[aria-pressed="true"] { background: var(--teal-wash); }
+    .key { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; background: #f2f4f0; color: var(--ink); font: 10px var(--mono); }
+    .overlay { position: fixed; z-index: 20; inset: 0; background: #242d2a38; }
+    .overlay[hidden], .quake[hidden], .selftest[hidden] { display: none; }
+    .dashboard {
+      position: absolute; top: 16px; right: 16px; bottom: 16px; width: min(590px, calc(100vw - 32px));
+      display: flex; flex-direction: column; overflow: hidden; border: 1px solid #b7c1ba;
+      border-radius: 11px; background: var(--surface); box-shadow: 0 14px 40px #242d2a30;
+    }
+    .dash-head { padding: 15px 16px 10px; border-bottom: 1px solid var(--line); }
+    .dash-title { display: flex; flex-direction: column; gap: 3px; }
+    .dash-title p { margin: 0; color: var(--muted); font: 10px var(--mono); }
+    .dash-body { overflow-y: auto; padding: 12px 16px 18px; }
+    .dash-focus { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #f3f5f1; }
+    .dash-focus-row { justify-content: flex-start; flex-wrap: wrap; margin-top: 8px; }
+    .dash-focus .directions button, .dash-focus .reorder-actions button { min-width: 34px; min-height: 30px; padding: 4px; }
+    .dash-width { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+    .dash-width button { min-height: 29px; padding: 3px 7px; font-size: 10px; }
+    .dashboard-note { margin: 8px 0 12px; color: var(--muted); font-size: 11px; }
+    .dash-screen { margin-top: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #f6f7f4; }
+    .dash-screen-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .dash-screen-head button { min-height: 27px; padding: 3px 7px; font-size: 11px; font-weight: 600; }
+    .dash-apps { display: flex; flex-direction: column; gap: 5px; }
+    .dash-app { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+    .dash-app.is-focused { border-color: var(--teal); box-shadow: inset 2px 0 var(--teal); }
+    .dash-app .app-select { min-height: 35px; padding: 3px 4px; }
+    .dash-app .app-name { font-size: 12px; }
+    .dash-app .app-subtitle { font-size: 9px; }
+    .dash-order { display: flex; gap: 4px; }
+    .dash-order button { width: 28px; min-height: 27px; padding: 2px; font: 11px var(--mono); }
+    .dash-empty { padding: 10px; color: var(--muted); font-size: 11px; }
+    .quake {
+      position: fixed; z-index: 30; top: 22px; left: 50%; width: min(480px, calc(100vw - 28px));
+      transform: translateX(-50%); overflow: hidden; border: 1px solid #aab5ae; border-radius: 9px;
+      background: #f7f8f5; box-shadow: 0 14px 34px #242d2a38;
+    }
+    .quake-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; }
+    .quake-head span:last-child { color: var(--muted); font: 10px var(--mono); }
+    .terminal { margin: 0; padding: 14px; color: #30433c; background: #eff2ee; font: 12px/1.65 var(--mono); white-space: pre-wrap; }
+    .selftest { position: fixed; z-index: 50; right: 12px; bottom: 12px; max-width: min(520px, calc(100vw - 24px)); padding: 10px 12px; border: 1px solid var(--teal); border-radius: 7px; background: var(--surface); color: var(--ink); font: 11px/1.5 var(--mono); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 820px) {
+      .controls { grid-template-columns: 1fr 1fr; }
+      .focus-summary { grid-column: 1 / -1; }
+      .topbar { align-items: flex-start; }
+      .title-wrap { flex-direction: column; align-items: flex-start; gap: 3px; }
+    }
+    @media (max-width: 560px) {
+      .desk { padding: 12px 10px 18px; }
+      .topbar { gap: 7px; margin-bottom: 10px; }
+      .top-actions { gap: 5px; }
+      .top-actions button { min-height: 31px; padding: 4px 7px; font-size: 11px; }
+      .toolbar { align-items: flex-start; flex-direction: column; gap: 9px; }
+      .scenario-tabs { width: 100%; }
+      .scenario-tabs button { flex: 1; padding-inline: 5px; font-size: 10px; }
+      .map-viewport { height: 290px; }
+      .controls { gap: 8px; padding: 9px; }
+      .directions { gap: 4px; }
+      .control-block button { padding: 4px 6px; font-size: 10px; }
+      .hint { display: none; }
+      .dash-head { padding: 12px; }
+      .dash-body { padding: 10px 12px 14px; }
+      .dash-focus-row { gap: 6px; }
+      .dash-width { width: 100%; margin-left: 0; }
+      .dashboard { top: 8px; right: 8px; bottom: 8px; width: calc(100vw - 16px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="desk" id="desk">
+    <header class="topbar">
+      <div class="title-wrap">
+        <p class="eyebrow">PERSOONLIJKE WINDOWMANAGER · DEMO</p>
+        <h1>Schermwerk</h1>
+      </div>
+      <div class="top-actions">
+        <button id="dashboardButton" type="button" aria-expanded="true" aria-controls="dashboardOverlay">Dashboard</button>
+        <button id="quakeButton" type="button" aria-pressed="false">Quake <span class="key">Hyper+T</span></button>
+      </div>
+    </header>
+
+    <main>
+      <section class="toolbar" aria-label="Demo-instellingen">
+        <div class="toolbar-group">
+          <label class="field-label" for="topologySelect">Opstelling</label>
+          <select id="topologySelect">
+            <option value="home">Thuis-demo</option>
+            <option value="office">Kantoor-demo</option>
+            <option value="laptop">Laptop-demo</option>
+          </select>
+          <span class="hint">fictieve schermgeometrie</span>
+        </div>
+        <div class="toolbar-group">
+          <span class="field-label">Scenario</span>
+          <div class="scenario-tabs" id="scenarioTabs" role="group" aria-label="Kies walkthrough"></div>
+        </div>
+      </section>
+
+      <section class="workspace" aria-labelledby="mapHeading">
+        <div class="section-heading">
+          <h2 id="mapHeading">Schermoverzicht</h2>
+          <span class="section-meta" id="mapMeta"></span>
+        </div>
+        <div class="map-viewport" id="mapViewport" aria-label="Ruimtelijke schermkaart">
+          <div class="screen-map" id="screenMap"></div>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Geselecteerd venster bedienen">
+        <div class="focus-summary">
+          <div class="focus-title" id="focusTitle">Geen venster geselecteerd</div>
+          <p class="state-line" id="stateSummary"></p>
+        </div>
+        <div class="control-block">
+          <span class="small-label">Verplaats naar scherm <span class="hint">Hyper+Pijlen</span></span>
+          <div class="directions" data-direction-group>
+            <button type="button" data-action="direction" data-direction="left" data-restore-focus="work-move-left" aria-label="Verplaats geselecteerd venster naar links">←</button>
+            <button type="button" data-action="direction" data-direction="right" data-restore-focus="work-move-right" aria-label="Verplaats geselecteerd venster naar rechts">→</button>
+            <button type="button" data-action="direction" data-direction="up" data-restore-focus="work-move-up" aria-label="Verplaats geselecteerd venster omhoog">↑</button>
+            <button type="button" data-action="direction" data-direction="down" data-restore-focus="work-move-down" aria-label="Verplaats geselecteerd venster omlaag">↓</button>
+          </div>
+        </div>
+        <div class="control-block">
+          <span class="small-label" id="sizeControlLabel">Breedte</span>
+          <div class="preset-buttons" id="workWidthGroup" data-width-group></div>
+        </div>
+      </section>
+      <div class="control-row">
+        <div class="feedback" id="feedback" aria-live="polite"></div>
+        <div class="reorder-actions" aria-label="Volgorde aanpassen">
+          <span class="hint">Volgorde</span>
+          <button type="button" data-action="reorder" data-delta="-1" data-restore-focus="work-reorder-left" aria-label="Zet geselecteerd venster één plek eerder in de strook">←</button>
+          <button type="button" data-action="reorder" data-delta="1" data-restore-focus="work-reorder-right" aria-label="Zet geselecteerd venster één plek later in de strook">→</button>
+        </div>
+      </div>
+      <section class="walkthrough" aria-label="Walkthrough-stappen">
+        <h2 id="walkthroughTitle">Programmeren</h2>
+        <div class="walkthrough-steps" id="walkthroughSteps"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="overlay" id="dashboardOverlay" hidden>
+    <section class="dashboard" role="dialog" aria-modal="true" aria-labelledby="dashboardTitle">
+      <header class="dash-head">
+        <div class="dash-title">
+          <h2 id="dashboardTitle">Dashboard</h2>
+          <p id="dashboardContext"></p>
+        </div>
+        <button id="closeDashboard" type="button">Sluiten <span class="key">Esc</span></button>
+      </header>
+      <div class="dash-body">
+        <section class="dash-focus" aria-label="Acties voor geselecteerd venster">
+          <h3 id="dashFocusTitle">Geen venster geselecteerd</h3>
+          <div class="dash-focus-row">
+            <div class="directions" aria-label="Verplaats naar een ander scherm">
+              <button type="button" data-action="direction" data-direction="left" data-restore-focus="dash-move-left" aria-label="Verplaats geselecteerd venster naar links">←</button>
+              <button type="button" data-action="direction" data-direction="right" data-restore-focus="dash-move-right" aria-label="Verplaats geselecteerd venster naar rechts">→</button>
+              <button type="button" data-action="direction" data-direction="up" data-restore-focus="dash-move-up" aria-label="Verplaats geselecteerd venster omhoog">↑</button>
+              <button type="button" data-action="direction" data-direction="down" data-restore-focus="dash-move-down" aria-label="Verplaats geselecteerd venster omlaag">↓</button>
+            </div>
+            <div class="reorder-actions" aria-label="Volgorde aanpassen">
+              <button type="button" data-action="reorder" data-delta="-1" data-restore-focus="dash-reorder-left" aria-label="Zet geselecteerd venster één plek eerder in de strook">←</button>
+              <button type="button" data-action="reorder" data-delta="1" data-restore-focus="dash-reorder-right" aria-label="Zet geselecteerd venster één plek later in de strook">→</button>
+            </div>
+            <span class="small-label" id="dashSizeControlLabel">Breedte</span>
+            <div class="dash-width" id="dashWidthGroup" data-width-group></div>
+          </div>
+        </section>
+        <p class="dashboard-note">Sleep tegels om te herschikken. De pijlen en afmetingen werken ook met toetsenbord.</p>
+        <div id="dashboardScreens"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="quake" id="quakeWindow" role="dialog" aria-label="Quake-terminalmock" hidden>
+    <div class="quake-head"><span>Quake · terminalmock</span><span>Hyper+T</span></div>
+    <pre class="terminal">casper@demo ~/workspace
+$ git status --short
+ M personal-wm/prototype.html
+
+casper@demo ~/workspace
+$ _</pre>
+  </section>
+  <div class="selftest" id="selftestReport" aria-live="polite" hidden></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const MAP_W = 1200;
+      const MAP_H = 500;
+      const WIDTHS = {
+        third: { label: "⅓", fraction: 1 / 3 },
+        half: { label: "½", fraction: 1 / 2 },
+        twoThirds: { label: "⅔", fraction: 2 / 3 },
+        full: { label: "Volledig", fraction: 1 }
+      };
+      const APPS = {
+        terminal: { name: "Terminal", subtitle: "shell · mock", width: "third" },
+        browser: { name: "Browser", subtitle: "referenties", width: "half" },
+        editor: { name: "Editor", subtitle: "persoonlijk-wm", width: "half" },
+        chat: { name: "Chat", subtitle: "team", width: "third" },
+        notes: { name: "Notities", subtitle: "werknotities", width: "third" },
+        review: { name: "Review", subtitle: "wijzigingen", width: "half" },
+        calendar: { name: "Agenda", subtitle: "afspraken", width: "third" },
+        meeting: { name: "Meeting", subtitle: "video · mock", width: "half" },
+        slides: { name: "Presentatie", subtitle: "deck · mock", width: "twoThirds" }
+      };
+      const SCREEN_NAMES = { laptop: "Laptop", wide: "Breed scherm", portrait: "Portret" };
+      const TOPOLOGIES = {
+        home: {
+          label: "Thuis-demo", screens: ["laptop", "wide", "portrait"],
+          geometry: {
+            laptop: { x: 85, y: 300, w: 300, h: 188 },
+            wide: { x: 430, y: 140, w: 460, h: 260 },
+            portrait: { x: 910, y: 42, w: 185, h: 420 }
+          }
+        },
+        office: {
+          label: "Kantoor-demo", screens: ["laptop", "wide", "portrait"],
+          geometry: {
+            wide: { x: 150, y: 35, w: 450, h: 253 },
+            portrait: { x: 600, y: 35, w: 450, h: 253 },
+            laptop: { x: 450, y: 305, w: 300, h: 188 }
+          }
+        },
+        laptop: {
+          label: "Laptop-demo", screens: ["laptop"],
+          geometry: { laptop: { x: 410, y: 142, w: 380, h: 235 } }
+        }
+      };
+      const SCENARIOS = {
+        coding: {
+          label: "Programmeren",
+          screens: { laptop: ["terminal", "browser"], wide: ["editor", "chat", "notes"], portrait: ["review"] },
+          focusScreen: "wide", focusApp: "editor",
+          steps: [
+            { label: "1 · Focus Editor", run: s => focusAppState(s, "wide", "editor") },
+            { label: "2 · Maak ruimte", run: s => widthState(s, "editor", "twoThirds") },
+            { label: "3 · Verplaats Editor", run: s => moveAppState(s, "wide", "editor", "right") }
+          ]
+        },
+        review: {
+          label: "Reviewen",
+          screens: { laptop: ["terminal", "browser"], wide: ["review", "notes", "chat"], portrait: ["calendar"] },
+          focusScreen: "wide", focusApp: "review",
+          steps: [
+            { label: "1 · Focus Review", run: s => focusAppState(s, "wide", "review") },
+            { label: "2 · Geef ruimte", run: s => widthState(s, "review", "twoThirds") },
+            { label: "3 · Verplaats Browser", run: s => moveAppState(s, "laptop", "browser", "up") }
+          ]
+        },
+        meeting: {
+          label: "Vergaderen",
+          screens: { laptop: ["calendar", "meeting"], wide: ["slides", "notes", "review"], portrait: ["chat"] },
+          focusScreen: "laptop", focusApp: "meeting",
+          steps: [
+            { label: "1 · Focus Meeting", run: s => focusAppState(s, "laptop", "meeting") },
+            { label: "2 · Maak schermvullend", run: s => widthState(s, "meeting", "full") },
+            { label: "3 · Verzamel op Laptop", run: s => topologyState(s, "laptop") }
+          ]
+        }
+      };
+
+      function createState(scenarioId = "coding", dashboardOpen = true, quakeOpen = false) {
+        const scenario = SCENARIOS[scenarioId];
+        const screens = { laptop: [], wide: [], portrait: [] };
+        Object.entries(scenario.screens).forEach(([screenId, apps]) => { screens[screenId] = [...apps]; });
+        return {
+          scenarioId, scenarioStep: -1, topology: scenarioId === "coding" ? "home" : "office",
+          screens, selectedScreen: scenario.focusScreen, focusAppId: scenario.focusApp,
+          widths: Object.fromEntries(Object.entries(APPS).map(([id, app]) => [id, app.width])),
+          dashboardOpen, quakeOpen, focusGuard: false, feedback: "Kies een tegel, probeer de pijlen of volg een walkthrough."
+        };
+      }
+
+      function overlap(a1, a2, b1, b2) { return Math.max(0, Math.min(a2, b2) - Math.max(a1, b1)); }
+
+      function isVerticalScreen(topologyId, screenId) { return topologyId === "home" && screenId === "portrait"; }
+      function screenName(topologyId, screenId) {
+        if (topologyId === "office" && screenId === "wide") return "Linkerscherm";
+        if (topologyId === "office" && screenId === "portrait") return "Rechterscherm";
+        return SCREEN_NAMES[screenId] || screenId;
+      }
+      function sizeAxis(topologyId, screenId) {
+        const vertical = isVerticalScreen(topologyId, screenId);
+        return { vertical, label: vertical ? "hoogte" : "breedte", adjective: vertical ? "hoog" : "breed" };
+      }
+      function keyboardCommand(topologyId, screenId, key, shift) {
+        const vertical = isVerticalScreen(topologyId, screenId);
+        const previous = vertical ? "ArrowUp" : "ArrowLeft";
+        const next = vertical ? "ArrowDown" : "ArrowRight";
+        if (key !== previous && key !== next) return { kind: "wrong-axis", vertical };
+        return { kind: shift ? "reorder" : "focus", delta: key === previous ? -1 : 1, vertical };
+      }
+
+      function directionalTarget(topologyId, sourceId, direction, definitions = TOPOLOGIES) {
+        const topology = definitions[topologyId];
+        const source = topology?.geometry[sourceId] || null;
+        if (!source) return null;
+        const right = source.x + source.w;
+        const bottom = source.y + source.h;
+        const cx = source.x + source.w / 2;
+        const cy = source.y + source.h / 2;
+        const candidates = topology.screens
+          .filter(id => id !== sourceId)
+          .map(id => ({ id, rect: topology.geometry[id] }))
+          .filter(item => {
+            const x = item.rect.x + item.rect.w / 2;
+            const y = item.rect.y + item.rect.h / 2;
+            return direction === "right" ? x > cx : direction === "left" ? x < cx : direction === "up" ? y < cy : y > cy;
+          })
+          .map(item => {
+            const r = item.rect;
+            const orthogonalOverlap = direction === "left" || direction === "right"
+              ? overlap(source.y, bottom, r.y, r.y + r.h)
+              : overlap(source.x, right, r.x, r.x + r.w);
+            const gap = direction === "right" ? Math.max(0, r.x - right)
+              : direction === "left" ? Math.max(0, source.x - (r.x + r.w))
+              : direction === "down" ? Math.max(0, r.y - bottom)
+              : Math.max(0, source.y - (r.y + r.h));
+            const orthogonalDistance = direction === "left" || direction === "right"
+              ? Math.abs(cy - (r.y + r.h / 2))
+              : Math.abs(cx - (r.x + r.w / 2));
+            const centerDistance = Math.hypot(cx - (r.x + r.w / 2), cy - (r.y + r.h / 2));
+            return { id: item.id, overlap: orthogonalOverlap, gap, orthogonalDistance, centerDistance };
+          });
+        const overlapping = candidates.filter(candidate => candidate.overlap > 0);
+        const pool = overlapping.length ? overlapping : candidates;
+        pool.sort((a, b) => (overlapping.length ? a.gap - b.gap || a.orthogonalDistance - b.orthogonalDistance : a.centerDistance - b.centerDistance) || a.id.localeCompare(b.id));
+        return pool[0]?.id || null;
+      }
+
+      function focusAfterRemoval(apps, removedIndex) {
+        if (!apps.length) return null;
+        const index = Math.min(removedIndex, apps.length - 1);
+        return apps[index] ?? apps[index - 1] ?? null;
+      }
+
+      function findAppScreen(s, appId) {
+        return Object.keys(s.screens).find(screenId => s.screens[screenId].includes(appId)) || null;
+      }
+
+      function focusAppState(s, screenId, appId) {
+        if (!TOPOLOGIES[s.topology].screens.includes(screenId) || !s.screens[screenId].includes(appId)) return false;
+        s.selectedScreen = screenId;
+        s.focusAppId = appId;
+        return true;
+      }
+
+      function widthState(s, appId, widthId) {
+        if (!Object.hasOwn(WIDTHS, widthId) || !findAppScreen(s, appId)) return false;
+        s.widths[appId] = widthId;
+        return true;
+      }
+
+      function moveAppState(s, sourceId, appId, direction) {
+        if (!TOPOLOGIES[s.topology].screens.includes(sourceId)) return { ok: false, reason: "missing-source" };
+        const source = s.screens[sourceId];
+        const oldIndex = source.indexOf(appId);
+        if (oldIndex < 0) return { ok: false, reason: "missing-app" };
+        const targetId = directionalTarget(s.topology, sourceId, direction);
+        if (!targetId) return { ok: false, reason: "no-target" };
+        source.splice(oldIndex, 1);
+        s.screens[targetId].push(appId);
+        s.selectedScreen = sourceId;
+        s.focusAppId = focusAfterRemoval(source, oldIndex);
+        s.focusGuard = true;
+        return { ok: true, sourceId, targetId };
+      }
+
+      function reorderState(s, screenId, appId, delta) {
+        const apps = s.screens[screenId] || [];
+        const index = apps.indexOf(appId);
+        const next = index + delta;
+        if (index < 0 || next < 0 || next >= apps.length) return false;
+        [apps[index], apps[next]] = [apps[next], apps[index]];
+        s.selectedScreen = screenId;
+        s.focusAppId = appId;
+        s.focusGuard = true;
+        return true;
+      }
+
+      function dropState(s, appId, sourceId, targetId, beforeId = null) {
+        const source = s.screens[sourceId] || [];
+        const oldIndex = source.indexOf(appId);
+        const target = s.screens[targetId];
+        if (oldIndex < 0 || !target || !TOPOLOGIES[s.topology].screens.includes(targetId)) return false;
+        if (sourceId === targetId && beforeId === appId) return false;
+        source.splice(oldIndex, 1);
+        let insertAt = beforeId ? target.indexOf(beforeId) : target.length;
+        if (insertAt < 0) insertAt = target.length;
+        if (sourceId === targetId && insertAt === oldIndex) { source.splice(oldIndex, 0, appId); return false; }
+        target.splice(insertAt, 0, appId);
+        s.selectedScreen = sourceId;
+        if (sourceId !== targetId) s.focusAppId = focusAfterRemoval(source, oldIndex);
+        else if (!source.includes(s.focusAppId)) s.focusAppId = focusAfterRemoval(source, oldIndex);
+        s.focusGuard = true;
+        return true;
+      }
+
+      function topologyState(s, topologyId) {
+        if (!TOPOLOGIES[topologyId] || topologyId === s.topology) return false;
+        const previousTopology = s.topology;
+        const visible = TOPOLOGIES[topologyId].screens;
+        const disappeared = TOPOLOGIES[previousTopology].screens.filter(id => !visible.includes(id)).sort();
+        disappeared.forEach(id => {
+          s.screens.laptop.push(...s.screens[id]);
+          s.screens[id] = [];
+        });
+        const priorFocus = s.focusAppId;
+        const priorScreen = s.selectedScreen;
+        s.topology = topologyId;
+        if (!visible.includes(s.selectedScreen)) {
+          const focusScreen = priorFocus ? findAppScreen(s, priorFocus) : null;
+          s.selectedScreen = focusScreen && visible.includes(focusScreen) ? focusScreen : "laptop";
+        }
+        if (priorFocus && s.screens[s.selectedScreen].includes(priorFocus)) s.focusAppId = priorFocus;
+        else s.focusAppId = s.screens[s.selectedScreen][0] || null;
+        s.focusGuard = true;
+        return { ok: true, disappeared, priorScreen };
+      }
+
+      function snapshot(s) {
+        return {
+          scenario: s.scenarioId, topology: s.topology, selectedScreen: s.selectedScreen,
+          focusAppId: s.focusAppId, widths: { ...s.widths }, screens: Object.fromEntries(Object.entries(s.screens).map(([id, apps]) => [id, [...apps]])),
+          dashboardOpen: s.dashboardOpen, quakeOpen: s.quakeOpen, focusGuard: s.focusGuard
+        };
+      }
+
+      function runSelfTest() {
+        const checks = [];
+        const assert = (condition, message) => { if (!condition) throw new Error(message); checks.push(message); };
+        const demo = createState("coding", false, false);
+        assert(isVerticalScreen("home", "portrait") && !isVerticalScreen("office", "portrait"), "portrait ID is vertical at home and landscape at the office");
+        const office = TOPOLOGIES.office.geometry;
+        assert(office.wide.x + office.wide.w === office.portrait.x && office.wide.y === office.portrait.y && office.wide.w === office.portrait.w && office.wide.h === office.portrait.h, "office screens touch side-by-side at equal geometry");
+        assert(office.laptop.x + office.laptop.w / 2 === office.wide.x + office.wide.w, "office laptop is centered under the display seam");
+        assert(directionalTarget("office", "wide", "right") === "portrait" && directionalTarget("office", "portrait", "left") === "wide", "office displays route left and right to each other");
+        assert(directionalTarget("office", "laptop", "up") === "portrait", "office laptop up ties resolve by stable screen ID");
+        const portraitKeyboard = createState("coding", false, false);
+        portraitKeyboard.screens.portrait = ["review", "notes", "chat"];
+        focusAppState(portraitKeyboard, "portrait", "notes");
+        const verticalUp = keyboardCommand("home", "portrait", "ArrowUp", false);
+        const verticalDown = keyboardCommand("home", "portrait", "ArrowDown", true);
+        assert(verticalUp.kind === "focus" && verticalUp.delta === -1 && verticalDown.kind === "reorder" && verticalDown.delta === 1, "portrait uses Option up and down for focus and reorder");
+        assert(reorderState(portraitKeyboard, "portrait", "notes", verticalDown.delta) && portraitKeyboard.screens.portrait.join(",") === "review,chat,notes", "portrait reorder changes the vertical sequence");
+        const landscapeKeyboard = keyboardCommand("office", "portrait", "ArrowLeft", false);
+        assert(landscapeKeyboard.kind === "focus" && landscapeKeyboard.delta === -1 && keyboardCommand("office", "portrait", "ArrowUp", false).kind === "wrong-axis", "office right display uses horizontal focus keys");
+        assert(directionalTarget("home", "wide", "right") === "portrait", "overlap-priority chooses the right portrait display");
+        assert(directionalTarget("home", "laptop", "up") === "wide", "nearest forward display wins without orthogonal overlap");
+        const custom = {
+          tie: { screens: ["source", "zeta", "alpha"], geometry: {
+            source: { x: 0, y: 0, w: 100, h: 100 }, zeta: { x: 200, y: 0, w: 100, h: 100 }, alpha: { x: 200, y: 0, w: 100, h: 100 }
+          } }
+        };
+        assert(directionalTarget("tie", "source", "right", custom) === "alpha", "equal geometry ties break by stable screen ID");
+        assert(focusAfterRemoval(["a", "c"], 1) === "c" && focusAfterRemoval([], 0) === null, "source focus picks nearest remaining tile or none");
+        const before = Object.values(demo.screens).flat().sort().join(",");
+        topologyState(demo, "laptop"); topologyState(demo, "office"); topologyState(demo, "home");
+        const afterList = Object.values(demo.screens).flat();
+        assert(afterList.length === new Set(afterList).size && [...afterList].sort().join(",") === before, "topology cycles conserve app IDs exactly once");
+        assert(demo.screens.wide.length === 0 && demo.screens.portrait.length === 0, "returning displays do not restore collected tiles");
+        const drag = createState("coding", false, false);
+        const dragBefore = Object.values(drag.screens).flat().sort().join(",");
+        assert(dropState(drag, "chat", "wide", "wide", "editor"), "drag reorder changes the ordered strip");
+        assert(dropState(drag, "editor", "wide", "portrait"), "drag between displays moves the tile");
+        const dragAfter = Object.values(drag.screens).flat();
+        assert(dragAfter.length === new Set(dragAfter).size && [...dragAfter].sort().join(",") === dragBefore, "drag actions conserve app IDs exactly once");
+        const isolated = createState("coding", false, false);
+        topologyState(isolated, "laptop");
+        const noTargetBefore = JSON.stringify(isolated.screens);
+        assert(moveAppState(isolated, "laptop", "terminal", "left").reason === "no-target", "missing destination reports a no-op");
+        assert(JSON.stringify(isolated.screens) === noTargetBefore, "missing destination leaves app placement unchanged");
+        return { checks: checks.length, messages: checks };
+      }
+
+      let state = createState();
+      const byId = id => document.getElementById(id);
+      const html = value => String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+      const currentScenario = () => SCENARIOS[state.scenarioId];
+      const appName = id => APPS[id]?.name || id;
+      const selectedApps = () => state.screens[state.selectedScreen] || [];
+      const selectedWidth = () => state.focusAppId ? state.widths[state.focusAppId] : null;
+
+      function setFeedback(message) { state.feedback = message; byId("feedback").textContent = message; }
+
+      function focusContext() {
+        const name = state.focusAppId ? appName(state.focusAppId) : "Geen venster geselecteerd";
+        const screen = screenName(state.topology, state.selectedScreen);
+        const axis = sizeAxis(state.topology, state.selectedScreen);
+        return { name, screen, size: state.focusAppId ? `${WIDTHS[state.widths[state.focusAppId]].label} ${axis.adjective}` : "—", axis };
+      }
+
+      function syncFocusUI() {
+        const ctx = focusContext();
+        byId("focusTitle").textContent = state.focusAppId ? `${ctx.name} · ${ctx.screen}` : `${ctx.screen} · geen venster geselecteerd`;
+        byId("dashFocusTitle").textContent = state.focusAppId ? `${ctx.name} · ${ctx.screen}` : `${ctx.screen} · geen venster geselecteerd`;
+        byId("stateSummary").textContent = `${currentScenario().label} · ${TOPOLOGIES[state.topology].label} · ${ctx.size} · ${Object.values(state.screens).flat().length} apps zichtbaar`;
+        byId("dashboardContext").textContent = `${TOPOLOGIES[state.topology].label} · ${ctx.screen}`;
+        byId("mapMeta").textContent = `${TOPOLOGIES[state.topology].label} · actief: ${ctx.screen}`;
+        byId("sizeControlLabel").textContent = ctx.axis.vertical ? "Hoogte" : "Breedte";
+        byId("dashSizeControlLabel").textContent = ctx.axis.vertical ? "Hoogte" : "Breedte";
+        document.querySelectorAll("[data-action='reorder']").forEach(button => {
+          const previous = button.dataset.delta === "-1";
+          const word = ctx.axis.vertical ? (previous ? "omhoog" : "omlaag") : (previous ? "naar links" : "naar rechts");
+          button.textContent = ctx.axis.vertical ? (previous ? "↑" : "↓") : (previous ? "←" : "→");
+          button.setAttribute("aria-label", `Zet geselecteerd venster één tegel ${word} in de strook ${ctx.screen}`);
+        });
+        byId("scenarioTabs").querySelectorAll("[data-scenario]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.scenario === state.scenarioId)));
+        if (byId("feedback").textContent !== state.feedback) byId("feedback").textContent = state.feedback;
+        document.querySelectorAll("[data-app-card]").forEach(card => {
+          const focused = card.dataset.screenId === state.selectedScreen && card.dataset.appId === state.focusAppId;
+          card.classList.toggle("is-focused", focused);
+          const button = card.querySelector("[data-action='focus-app']");
+          if (button) button.setAttribute("aria-pressed", String(focused));
+        });
+        document.querySelectorAll("[data-screen-card]").forEach(screen => screen.classList.toggle("is-current", screen.dataset.screenCard === state.selectedScreen));
+        document.querySelectorAll("[data-width-button]").forEach(button => {
+          button.setAttribute("aria-pressed", String(button.dataset.widthButton === selectedWidth()));
+          button.disabled = !state.focusAppId;
+        });
+        byId("dashboardButton").setAttribute("aria-expanded", String(state.dashboardOpen));
+        byId("quakeButton").setAttribute("aria-pressed", String(state.quakeOpen));
+      }
+
+      function cardMarkup(appId, screenId, dashboard = false) {
+        const app = APPS[appId];
+        const width = state.widths[appId];
+        const vertical = isVerticalScreen(state.topology, screenId);
+        const orientation = vertical ? "vertical" : "horizontal";
+        const axis = sizeAxis(state.topology, screenId);
+        if (dashboard) {
+          return `<article class="dash-app" data-app-card data-drop-app data-app-id="${html(appId)}" data-screen-id="${html(screenId)}" data-drag-app draggable="true">
+            <button class="app-select" id="dash-focus-${html(screenId)}-${html(appId)}" type="button" data-action="focus-app" data-app-id="${html(appId)}" data-screen-id="${html(screenId)}" aria-pressed="false">
+              <span class="app-name">${html(app.name)}</span><span class="app-subtitle">${html(app.subtitle)} · ${html(WIDTHS[width].label)} ${axis.adjective}</span>
+            </button>
+            <div class="dash-order" aria-label="Volgorde van ${html(app.name)}">
+              <button type="button" data-restore-focus="dash-order-${html(screenId)}-${html(appId)}-left" data-action="reorder-specific" data-app-id="${html(appId)}" data-screen-id="${html(screenId)}" data-delta="-1" aria-label="Zet ${html(app.name)} ${vertical ? "omhoog" : "naar links"} in de strook ${html(screenName(state.topology, screenId))}">${vertical ? "↑" : "←"}</button>
+              <button type="button" data-restore-focus="dash-order-${html(screenId)}-${html(appId)}-right" data-action="reorder-specific" data-app-id="${html(appId)}" data-screen-id="${html(screenId)}" data-delta="1" aria-label="Zet ${html(app.name)} ${vertical ? "omlaag" : "naar rechts"} in de strook ${html(screenName(state.topology, screenId))}">${vertical ? "↓" : "→"}</button>
+            </div>
+          </article>`;
+        }
+        return `<article class="app-card" style="--tile-size:${WIDTHS[width].fraction * 100}%" data-app-card data-drop-app data-app-id="${html(appId)}" data-screen-id="${html(screenId)}" data-drag-app draggable="true">
+          <button class="app-select" id="map-focus-${html(screenId)}-${html(appId)}" type="button" data-action="focus-app" data-app-id="${html(appId)}" data-screen-id="${html(screenId)}" aria-pressed="false">
+            <span class="app-name">${html(app.name)}</span><span class="app-subtitle">${html(app.subtitle)}</span>
+          </button><span class="app-width">${html(WIDTHS[width].label)} ${axis.adjective}</span>
+        </article>`;
+      }
+
+      function renderScreens() {
+        const topology = TOPOLOGIES[state.topology];
+        byId("screenMap").innerHTML = topology.screens.map(screenId => {
+          const rect = topology.geometry[screenId];
+          const apps = state.screens[screenId];
+          const vertical = isVerticalScreen(state.topology, screenId);
+          const contents = apps.length ? apps.map(appId => cardMarkup(appId, screenId)).join("") : `<div class="empty-strip">Geen apps · sleep een tegel hierheen</div>`;
+          return `<section class="monitor" data-screen-card="${screenId}" data-screen-id="${screenId}" data-drop-screen style="left:${rect.x}px;top:${rect.y}px;width:${rect.w}px;height:${rect.h}px">
+            <div class="monitor-head"><button class="screen-select" id="map-screen-${screenId}" data-restore-focus="map-screen-${screenId}" type="button" data-action="select-screen" data-screen-id="${screenId}">${html(screenName(state.topology, screenId))}</button><span class="screen-id">DEMO</span></div>
+            <div class="screen-face"><div class="screen-strip-label"><span>${vertical ? "Verticale vensterstrook" : "Horizontale vensterstrook"}</span><span>${apps.length} ${apps.length === 1 ? "app" : "apps"}</span></div><div class="app-strip${vertical ? " is-vertical" : ""}" data-axis="${vertical ? "vertical" : "horizontal"}" data-drop-strip data-screen-id="${screenId}">${contents}</div></div>
+            <div class="map-footer"><span>${rect.w} × ${rect.h}</span><span>${html(TOPOLOGIES[state.topology].label)}</span></div>
+          </section>`;
+        }).join("");
+      }
+
+      function renderDashboard() {
+        byId("dashboardOverlay").hidden = !state.dashboardOpen;
+        byId("quakeWindow").hidden = !state.quakeOpen;
+        byId("desk").inert = state.dashboardOpen;
+        byId("dashboardScreens").innerHTML = TOPOLOGIES[state.topology].screens.map(screenId => {
+          const apps = state.screens[screenId];
+          const list = apps.length ? apps.map(appId => cardMarkup(appId, screenId, true)).join("") : `<div class="dash-empty">Geen apps op dit scherm.</div>`;
+          return `<section class="dash-screen" data-screen-card="${screenId}" data-screen-id="${screenId}" data-drop-screen>
+            <div class="dash-screen-head"><button id="dash-screen-${screenId}" data-restore-focus="dash-screen-${screenId}" type="button" data-action="select-screen" data-screen-id="${screenId}">${html(screenName(state.topology, screenId))}</button><span class="screen-id">${apps.length} ${apps.length === 1 ? "app" : "apps"}</span></div>
+            <div class="dash-apps" data-axis="vertical" data-drop-strip data-screen-id="${screenId}">${list}</div>
+          </section>`;
+        }).join("");
+        byId("walkthroughTitle").textContent = currentScenario().label;
+        byId("walkthroughSteps").innerHTML = currentScenario().steps.map((step, index) => `<button id="walkthrough-${index}" data-restore-focus="walkthrough-${index}" type="button" data-action="walkthrough" data-step="${index}" aria-pressed="${state.scenarioStep === index}">${html(step.label)}</button>`).join("");
+        document.querySelectorAll("[data-width-group]").forEach(group => {
+          const adjective = sizeAxis(state.topology, state.selectedScreen).adjective;
+          group.innerHTML = Object.entries(WIDTHS).map(([id, value]) => `<button type="button" data-width-button="${id}" data-restore-focus="${group.id}-${id}" data-action="width" data-width="${id}" aria-label="Maak venster ${html(value.label)} ${adjective}" aria-pressed="false">${html(value.label)}</button>`).join("");
+        });
+        byId("topologySelect").value = state.topology;
+      }
+
+      function renderAll(options = {}) {
+        const active = document.activeElement;
+        const activeKey = active?.dataset.restoreFocus;
+        const activeId = active?.id;
+        const scrollPositions = [...document.querySelectorAll("[data-drop-strip]")].map(strip => ({
+          screenId: strip.dataset.screenId, dashboard: strip.classList.contains("dash-apps"),
+          scrollLeft: strip.scrollLeft, scrollTop: strip.scrollTop
+        }));
+        const dashboardScrollTop = document.querySelector(".dash-body")?.scrollTop || 0;
+        renderScreens(); renderDashboard(); syncFocusUI();
+        scrollPositions.forEach(position => {
+          const strip = [...document.querySelectorAll("[data-drop-strip]")].find(element =>
+            element.dataset.screenId === position.screenId && element.classList.contains("dash-apps") === position.dashboard);
+          if (strip) { strip.scrollLeft = position.scrollLeft; strip.scrollTop = position.scrollTop; }
+        });
+        document.querySelector(".dash-body").scrollTop = dashboardScrollTop;
+        const replacement = activeKey
+          ? [...document.querySelectorAll("[data-restore-focus]")].find(element => element.dataset.restoreFocus === activeKey)
+          : activeId ? document.getElementById(activeId) : null;
+        const replacementInDashboard = Boolean(replacement?.closest(".dashboard"));
+        if (replacement && replacementInDashboard === state.dashboardOpen) replacement.focus({ preventScroll: true });
+        sizeMap();
+        if (options.revealFocusedTile) revealFocusedTile();
+      }
+
+      let mapScale = 1;
+      function sizeMap() {
+        const viewport = byId("mapViewport").getBoundingClientRect();
+        mapScale = Math.min(viewport.width / MAP_W, viewport.height / MAP_H);
+        const map = byId("screenMap");
+        map.style.left = `${Math.max(0, (viewport.width - MAP_W * mapScale) / 2)}px`;
+        map.style.top = `${Math.max(0, (viewport.height - MAP_H * mapScale) / 2)}px`;
+        map.style.transform = `scale(${mapScale})`;
+      }
+
+      function revealFocusedTile() {
+        if (!state.focusAppId) return;
+        const tile = byId(`map-focus-${state.selectedScreen}-${state.focusAppId}`)?.closest("[data-app-card]");
+        const strip = tile?.closest(".app-strip");
+        if (tile && strip) {
+          const tileRect = tile.getBoundingClientRect();
+          const stripRect = strip.getBoundingClientRect();
+          const scale = mapScale || 1;
+          if (isVerticalScreen(state.topology, state.selectedScreen)) {
+            if (tileRect.top < stripRect.top) strip.scrollTop += (tileRect.top - stripRect.top) / scale;
+            else if (tileRect.bottom > stripRect.bottom) strip.scrollTop += (tileRect.bottom - stripRect.bottom) / scale;
+          } else if (tileRect.left < stripRect.left) strip.scrollLeft += (tileRect.left - stripRect.left) / scale;
+          else if (tileRect.right > stripRect.right) strip.scrollLeft += (tileRect.right - stripRect.right) / scale;
+        }
+        const dashTile = byId(`dash-focus-${state.selectedScreen}-${state.focusAppId}`)?.closest("[data-app-card]");
+        const dashBody = document.querySelector(".dash-body");
+        if (state.dashboardOpen && dashTile && dashBody) {
+          const tileRect = dashTile.getBoundingClientRect();
+          const bodyRect = dashBody.getBoundingClientRect();
+          if (tileRect.top < bodyRect.top) dashBody.scrollTop += tileRect.top - bodyRect.top;
+          else if (tileRect.bottom > bodyRect.bottom) dashBody.scrollTop += tileRect.bottom - bodyRect.bottom;
+        }
+      }
+
+      function setFocus(screenId, appId, render = true) {
+        if (!focusAppState(state, screenId, appId)) return false;
+        if (render) renderAll(); else syncFocusUI();
+        return true;
+      }
+
+      function moveSelected(direction, override = null) {
+        const sourceId = override?.screenId || state.selectedScreen;
+        const appId = override?.appId || state.focusAppId;
+        if (!appId) { setFeedback(`Geen tegel geselecteerd op ${screenName(state.topology, sourceId)}.`); return; }
+        const result = moveAppState(state, sourceId, appId, direction);
+        if (!result.ok) {
+          setFeedback(result.reason === "no-target" ? `Geen scherm ${direction === "left" ? "links" : direction === "right" ? "rechts" : direction === "up" ? "boven" : "onder"} ${screenName(state.topology, sourceId)}.` : "Deze tegel staat niet meer op dat scherm.");
+          return;
+        }
+        setFeedback(`${appName(appId)} verplaatst naar ${screenName(state.topology, result.targetId)}. Focus blijft op ${screenName(state.topology, sourceId)}.`);
+        renderAll({ revealFocusedTile: true });
+      }
+
+      function setTopology(topologyId) {
+        if (topologyId === state.topology) return;
+        const result = topologyState(state, topologyId);
+        setFeedback(result.disappeared.length ? `${TOPOLOGIES[topologyId].label}: tegels van verdwijnende schermen zijn op Laptop verzameld.` : `${TOPOLOGIES[topologyId].label} geselecteerd.`);
+        renderAll({ revealFocusedTile: true });
+      }
+
+      function setScenario(scenarioId) {
+        const dashboardOpen = state.dashboardOpen;
+        const quakeOpen = state.quakeOpen;
+        state = createState(scenarioId, dashboardOpen, quakeOpen);
+        setFeedback(`${currentScenario().label}: voorbeeldindeling geladen. De acties blijven vrij te wijzigen.`);
+        renderAll();
+      }
+
+      function runWalkthroughStep(index) {
+        const step = currentScenario().steps[index];
+        if (!step) return;
+        const result = step.run(state);
+        state.scenarioStep = index;
+        if (result?.ok === false) setFeedback(`Deze stap kan nu niet worden uitgevoerd (${result.reason}).`);
+        else setFeedback(`Walkthrough ${currentScenario().label}: ${step.label.replace(/^\d+ · /, "")} uitgevoerd.`);
+        renderAll();
+      }
+
+      function closeDashboard() {
+        if (!state.dashboardOpen) return;
+        state.dashboardOpen = false;
+        renderAll();
+        byId("dashboardButton").focus();
+      }
+
+      function toggleDashboard() {
+        if (state.dashboardOpen) closeDashboard();
+        else {
+          state.dashboardOpen = true;
+          renderAll();
+          byId("closeDashboard").focus();
+        }
+      }
+
+      function toggleQuake() {
+        state.quakeOpen = !state.quakeOpen;
+        renderAll();
+        setFeedback(state.quakeOpen ? "Quake-terminalmock geopend. Klik buiten het venster om het zichtbaar te laten." : "Quake-terminalmock gesloten.");
+      }
+
+      function reorderCurrent(delta, override = null) {
+        const screenId = override?.screenId || state.selectedScreen;
+        const appId = override?.appId || state.focusAppId;
+        if (!appId) { setFeedback("Selecteer eerst een tegel om de volgorde te wijzigen."); return; }
+        if (!reorderState(state, screenId, appId, delta)) {
+          setFeedback(delta < 0 ? "Deze tegel staat al vooraan." : "Deze tegel staat al achteraan.");
+          return;
+        }
+        const axis = sizeAxis(state.topology, screenId);
+        const direction = axis.vertical ? (delta < 0 ? "omhoog" : "omlaag") : (delta < 0 ? "naar links" : "naar rechts");
+        setFeedback(`${appName(appId)} één plek ${direction} verplaatst.`);
+        renderAll({ revealFocusedTile: true });
+      }
+
+      function handleAction(button) {
+        const action = button.dataset.action;
+        if (action === "focus-app") {
+          const ok = setFocus(button.dataset.screenId, button.dataset.appId);
+          if (ok) setFeedback(`${appName(button.dataset.appId)} geselecteerd.`);
+        } else if (action === "select-screen") {
+          state.selectedScreen = button.dataset.screenId;
+          state.focusAppId = state.screens[state.selectedScreen][0] || null;
+          setFeedback(`${screenName(state.topology, state.selectedScreen)} geselecteerd.`);
+          renderAll();
+        } else if (action === "direction") moveSelected(button.dataset.direction);
+        else if (action === "reorder") reorderCurrent(Number(button.dataset.delta));
+        else if (action === "reorder-specific") reorderCurrent(Number(button.dataset.delta), { appId: button.dataset.appId, screenId: button.dataset.screenId });
+        else if (action === "width") {
+          if (!state.focusAppId) { setFeedback("Selecteer eerst een venster om de breedte aan te passen."); return; }
+          widthState(state, state.focusAppId, button.dataset.width);
+          const axis = sizeAxis(state.topology, state.selectedScreen);
+          setFeedback(`${appName(state.focusAppId)} is ${WIDTHS[state.widths[state.focusAppId]].label} ${axis.adjective}.`);
+          renderAll();
+        } else if (action === "walkthrough") runWalkthroughStep(Number(button.dataset.step));
+      }
+
+      document.addEventListener("click", event => {
+        const button = event.target.closest("button[data-action]");
+        if (button) handleAction(button);
+      });
+      byId("topologySelect").addEventListener("change", event => setTopology(event.target.value));
+      byId("dashboardButton").addEventListener("click", toggleDashboard);
+      byId("closeDashboard").addEventListener("click", closeDashboard);
+      byId("quakeButton").addEventListener("click", toggleQuake);
+      byId("scenarioTabs").innerHTML = Object.entries(SCENARIOS).map(([id, scenario]) => `<button type="button" data-scenario="${id}" aria-pressed="${id === state.scenarioId}">${html(scenario.label)}</button>`).join("");
+      byId("scenarioTabs").addEventListener("click", event => {
+        const button = event.target.closest("button[data-scenario]");
+        if (button) setScenario(button.dataset.scenario);
+      });
+
+      let lastPointer = null;
+      document.addEventListener("pointermove", event => {
+        if (!lastPointer) { lastPointer = { x: event.clientX, y: event.clientY }; return; }
+        const moved = event.clientX !== lastPointer.x || event.clientY !== lastPointer.y;
+        lastPointer = { x: event.clientX, y: event.clientY };
+        if (!moved) return;
+        if (state.focusGuard) { state.focusGuard = false; syncFocusUI(); }
+        if (state.dashboardOpen || event.pointerType === "touch") return;
+        const tile = event.target.closest("#screenMap [data-app-card]");
+        if (tile && (tile.dataset.appId !== state.focusAppId || tile.dataset.screenId !== state.selectedScreen)) {
+          setFocus(tile.dataset.screenId, tile.dataset.appId, false);
+        }
+      }, { passive: true });
+
+      let dragged = null;
+      document.addEventListener("dragstart", event => {
+        const tile = event.target.closest("[data-drag-app]");
+        if (!tile) return;
+        dragged = { appId: tile.dataset.appId, sourceId: tile.dataset.screenId };
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", `${dragged.sourceId}:${dragged.appId}`);
+      });
+      document.addEventListener("dragover", event => {
+        if (event.target.closest("[data-drop-strip], [data-drop-screen]")) event.preventDefault();
+      });
+      document.addEventListener("drop", event => {
+        const strip = event.target.closest("[data-drop-strip]");
+        const dropTarget = strip || event.target.closest("[data-drop-screen]");
+        if (!dragged || !dropTarget) return;
+        event.preventDefault();
+        const targetId = dropTarget.dataset.screenId;
+        const targetTile = event.target.closest("[data-drop-app]");
+        let beforeId = targetTile?.dataset.appId || null;
+        const rect = targetTile?.getBoundingClientRect();
+        const afterTile = targetTile && (strip?.dataset.axis === "vertical"
+          ? event.clientY > rect.top + rect.height / 2
+          : event.clientX > rect.left + rect.width / 2);
+        if (afterTile) {
+          const siblings = state.screens[targetId];
+          const index = siblings.indexOf(beforeId);
+          beforeId = siblings[index + 1] || null;
+        }
+        const ok = dropState(state, dragged.appId, dragged.sourceId, targetId, beforeId);
+        if (ok) setFeedback(`${appName(dragged.appId)} verplaatst in de schermstrook.`);
+        else setFeedback("De tegel staat al op die plek.");
+        dragged = null;
+        renderAll({ revealFocusedTile: true });
+      });
+      document.addEventListener("dragend", () => { dragged = null; });
+
+      document.addEventListener("keydown", event => {
+        if (state.dashboardOpen && event.key === "Escape") {
+          event.preventDefault(); event.stopPropagation(); closeDashboard(); return;
+        }
+        if (state.dashboardOpen && event.key === "Tab") {
+          const panel = document.querySelector(".dashboard");
+          const focusable = [...panel.querySelectorAll("button:not(:disabled), select, [tabindex]:not([tabindex='-1'])")];
+          const first = focusable[0], last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+        const target = event.target;
+        if (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+        if (event.altKey && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+          event.preventDefault();
+          const command = keyboardCommand(state.topology, state.selectedScreen, event.key, event.shiftKey);
+          if (command.kind === "wrong-axis") {
+            const expected = command.vertical ? "↑/↓" : "←/→";
+            setFeedback(`Gebruik Option+${expected} voor deze ${command.vertical ? "verticale" : "horizontale"} strook.`);
+            return;
+          }
+          if (!state.focusAppId) { setFeedback("Selecteer eerst een venster."); return; }
+          if (command.kind === "reorder") reorderCurrent(command.delta);
+          else {
+            const apps = selectedApps();
+            const index = apps.indexOf(state.focusAppId);
+            const next = index + command.delta;
+            if (next < 0 || next >= apps.length) setFeedback("Geen volgende tegel in deze richting.");
+            else { state.focusAppId = apps[next]; setFeedback(`${appName(state.focusAppId)} geselecteerd.`); renderAll({ revealFocusedTile: true }); }
+          }
+        }
+      }, true);
+
+      const observer = new ResizeObserver(sizeMap);
+      observer.observe(byId("mapViewport"));
+
+      function selfTest() { return runSelfTest(); }
+      window.demo = {
+        get state() { return snapshot(state); },
+        snapshot: () => snapshot(state),
+        actions: {
+          setTopology, setScenario, focus: (screenId, appId) => { const ok = setFocus(screenId, appId); return ok; },
+          move: moveSelected, moveApp: moveAppState, reorder: reorderCurrent, setWidth: (appId, widthId) => { const ok = widthState(state, appId, widthId); renderAll(); return ok; },
+          drag: (appId, sourceId, targetId, beforeId = null) => { const ok = dropState(state, appId, sourceId, targetId, beforeId); renderAll(); return ok; },
+          toggleDashboard, toggleQuake, walkthrough: runWalkthroughStep
+        },
+        selfTest
+      };
+
+      renderAll();
+      byId("desk").inert = state.dashboardOpen;
+      if (state.dashboardOpen) byId("closeDashboard").focus();
+      if (new URLSearchParams(location.search).get("selftest") === "1") {
+        try {
+          const result = selfTest();
+          byId("selftestReport").textContent = `Zelfcontrole geslaagd · ${result.checks} controles: ${result.messages.join(" · ")}`;
+        } catch (error) {
+          byId("selftestReport").textContent = `Zelfcontrole mislukt · ${error.message}`;
+          byId("selftestReport").style.borderColor = "#a33";
+        }
+        byId("selftestReport").hidden = false;
+      }
+    })();
+  </script>
+</body>
+</html>

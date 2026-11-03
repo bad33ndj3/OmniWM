@@ -7,6 +7,49 @@ import XCTest
 
 @MainActor
 final class FocusWithoutRaiseTests: XCTestCase {
+    func testDashboardFocusChoosesExactWindowAndReleasesHoverLease() throws {
+        for mode: TrackedWindowMode in [.tiling, .floating] {
+            let fixture = try makeFixture()
+            let source = addWindow(
+                pid: 820_050,
+                windowId: 820_150,
+                to: fixture.workspaceId,
+                controller: fixture.controller
+            )
+            let target = addWindow(
+                pid: source.pid,
+                windowId: 820_151,
+                to: fixture.workspaceId,
+                controller: fixture.controller,
+                mode: mode
+            )
+            setFocused(source, in: fixture.workspaceId, controller: fixture.controller)
+            let dashboard = fixture.controller.personalDashboardController
+            dashboard.show()
+            defer { dashboard.dismiss() }
+            fixture.recorder.operations.removeAll()
+
+            XCTAssertNil(dashboard.focus(pid: target.pid, windowID: UInt32(target.windowId)))
+            XCTAssertNil(fixture.controller.focusPolicyEngine.activeLease)
+            XCTAssertEqual(fixture.controller.intentLedger.activeManagedRequest?.token, target)
+            XCTAssertFalse(fixture.recorder.operations.isEmpty)
+            XCTAssertFalse(fixture.recorder.operations.contains(.focus(source)))
+            XCTAssertFalse(fixture.recorder.operations.contains(.submittedFocus(source)))
+        }
+    }
+
+    func testDashboardFocusRejectsStaleWindowWithoutClosingDashboard() throws {
+        let fixture = try makeFixture()
+        let dashboard = fixture.controller.personalDashboardController
+        dashboard.show()
+        defer { dashboard.dismiss() }
+        fixture.recorder.operations.removeAll()
+
+        XCTAssertNotNil(dashboard.focus(pid: 999_001, windowID: 999_002))
+        XCTAssertEqual(fixture.controller.focusPolicyEngine.activeLease?.owner, .personalDashboard)
+        XCTAssertTrue(fixture.recorder.operations.isEmpty)
+    }
+
     private enum FocusOperation: Equatable {
         case activate(pid_t)
         case focus(WindowToken)
@@ -26,6 +69,9 @@ final class FocusWithoutRaiseTests: XCTestCase {
         var workerAvailable = true
         var coverage: Bool?
         var coverageQueries: [(windowId: UInt32, candidates: Set<UInt32>)] = []
+        var overlappingWindowIdsAbove: [UInt32]?
+        var stackQueries: [(windowId: UInt32, candidates: Set<UInt32>)] = []
+        var orderedInByWindowId: [UInt32: Bool] = [:]
     }
 
     func testCoveredTiledMouseFocusRechecksCoverageOnRetry() throws {
@@ -55,6 +101,174 @@ final class FocusWithoutRaiseTests: XCTestCase {
             fixture.recorder.operations.removeAll()
             fixture.controller.retryManagedFocusFronting(request)
             XCTAssertEqual(fixture.recorder.operations, [.focus(target), .raise])
+        }
+    }
+
+    func testHoverFocusRestoresOnlyPreviouslyAboveVisibleFloatsInTheirOrder() throws {
+        let fixture = try makeFixture(raiseOnMouseFocus: false)
+        let target = addWindow(pid: 820_100, windowId: 820_200, to: fixture.workspaceId, controller: fixture.controller)
+        let top = addWindow(
+            pid: 820_101, windowId: 820_201, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        let secondTop = addWindow(
+            pid: 820_107, windowId: 820_207, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        let minimizedAfterCapture = addWindow(
+            pid: 820_102, windowId: 820_202, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        let lower = addWindow(
+            pid: 820_103, windowId: 820_203, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        let lowerThanTarget = addWindow(
+            pid: 820_104, windowId: 820_204, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        let minimized = addWindow(
+            pid: 820_105, windowId: 820_205, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        let hidden = addWindow(
+            pid: 820_106, windowId: 820_206, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        fixture.controller.workspaceManager.setWindowMinimized(true, token: minimized)
+        fixture.controller.workspaceManager.setHiddenState(
+            HiddenState(proportionalPosition: .zero, referenceMonitorId: nil, reason: .scratchpad),
+            for: hidden
+        )
+        fixture.recorder.overlappingWindowIdsAbove = [
+            UInt32(top.windowId), UInt32(secondTop.windowId), UInt32(minimizedAfterCapture.windowId)
+        ]
+        fixture.recorder.orderedInByWindowId[UInt32(minimizedAfterCapture.windowId)] = false
+
+        fixture.controller.focusWindow(target, origin: .focusFollowsMouse)
+
+        XCTAssertEqual(fixture.recorder.stackQueries.count, 1)
+        XCTAssertEqual(
+            fixture.recorder.stackQueries[0].candidates,
+            Set([
+                UInt32(top.windowId), UInt32(secondTop.windowId), UInt32(minimizedAfterCapture.windowId),
+                UInt32(lower.windowId), UInt32(lowerThanTarget.windowId)
+            ])
+        )
+        XCTAssertFalse(fixture.recorder.stackQueries[0].candidates.contains(UInt32(minimized.windowId)))
+        XCTAssertFalse(fixture.recorder.stackQueries[0].candidates.contains(UInt32(hidden.windowId)))
+        XCTAssertFalse(fixture.recorder.overlappingWindowIdsAbove?.contains(UInt32(lowerThanTarget.windowId)) == true)
+
+        let request = try XCTUnwrap(fixture.controller.intentLedger.activeManagedRequest)
+        let entry = try XCTUnwrap(fixture.controller.workspaceManager.entry(for: target))
+        fixture.controller.axEventHandler.frontmostApplicationPIDProvider = { target.pid }
+        fixture.controller.axEventHandler.handleManagedAppActivation(
+            entry: entry,
+            isWorkspaceActive: true,
+            appFullscreen: false,
+            source: .focusedWindowChanged,
+            activeRequestId: request.requestId
+        )
+
+        XCTAssertEqual(
+            fixture.recorder.operations,
+            [.focus(target), .order(UInt32(secondTop.windowId)), .order(UInt32(top.windowId))]
+        )
+    }
+
+    func testKeyboardFocusDoesNotRestoreFloatingStack() throws {
+        let fixture = try makeFixture(raiseOnMouseFocus: false)
+        let target = addWindow(pid: 820_110, windowId: 820_210, to: fixture.workspaceId, controller: fixture.controller)
+        let floating = addWindow(
+            pid: 820_111, windowId: 820_211, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        fixture.recorder.overlappingWindowIdsAbove = [UInt32(floating.windowId)]
+
+        fixture.controller.focusWindow(target)
+
+        XCTAssertTrue(fixture.recorder.stackQueries.isEmpty)
+        let request = try XCTUnwrap(fixture.controller.intentLedger.activeManagedRequest)
+        let entry = try XCTUnwrap(fixture.controller.workspaceManager.entry(for: target))
+        fixture.controller.axEventHandler.frontmostApplicationPIDProvider = { target.pid }
+        fixture.controller.axEventHandler.handleManagedAppActivation(
+            entry: entry,
+            isWorkspaceActive: true,
+            appFullscreen: false,
+            source: .focusedWindowChanged,
+            activeRequestId: request.requestId
+        )
+
+        XCTAssertFalse(fixture.recorder.operations.contains(.order(UInt32(floating.windowId))))
+    }
+
+    func testHoverFocusRestoresCapturedFloatAfterSameAppHandoff() throws {
+        let fixture = try makeFixture(raiseOnMouseFocus: false)
+        let source = addWindow(pid: 820_120, windowId: 820_220, to: fixture.workspaceId, controller: fixture.controller)
+        let target = addWindow(
+            pid: source.pid,
+            windowId: 820_221,
+            to: fixture.workspaceId,
+            controller: fixture.controller
+        )
+        let floating = addWindow(
+            pid: 820_121, windowId: 820_222, to: fixture.workspaceId, controller: fixture.controller, mode: .floating
+        )
+        setFocused(source, in: fixture.workspaceId, controller: fixture.controller)
+        fixture.recorder.overlappingWindowIdsAbove = [UInt32(floating.windowId)]
+        fixture.controller.axEventHandler.frontmostApplicationPIDProvider = { target.pid }
+
+        fixture.controller.focusWindow(target, origin: .focusFollowsMouse)
+        let request = try XCTUnwrap(fixture.controller.intentLedger.activeManagedRequest)
+        XCTAssertEqual(request.phase, .awaitingSameAppActivation(sourceToken: source))
+        XCTAssertEqual(fixture.recorder.operations, [.deactivate(source)])
+
+        fixture.controller.axEventHandler.handleIntentExpired(request.requestId)
+        let confirmationRequest = try XCTUnwrap(fixture.controller.intentLedger.activeManagedRequest)
+        let entry = try XCTUnwrap(fixture.controller.workspaceManager.entry(for: target))
+        fixture.controller.axEventHandler.handleManagedAppActivation(
+            entry: entry,
+            isWorkspaceActive: true,
+            appFullscreen: false,
+            source: .focusedWindowChanged,
+            activeRequestId: confirmationRequest.requestId
+        )
+
+        XCTAssertEqual(
+            fixture.recorder.operations,
+            [.deactivate(source), .activateSameApp(target), .order(UInt32(floating.windowId))]
+        )
+    }
+
+    func testCancelledOrSupersededHoverFocusCannotRestoreCapturedFloats() throws {
+        for isSuperseded in [false, true] {
+            let fixture = try makeFixture(raiseOnMouseFocus: false)
+            let target = addWindow(
+                pid: 820_130, windowId: 820_230, to: fixture.workspaceId, controller: fixture.controller
+            )
+            let floating = addWindow(
+                pid: 820_131, windowId: 820_231, to: fixture.workspaceId, controller: fixture.controller,
+                mode: .floating
+            )
+            fixture.recorder.overlappingWindowIdsAbove = [UInt32(floating.windowId)]
+            fixture.controller.axEventHandler.frontmostApplicationPIDProvider = { target.pid }
+            fixture.controller.focusWindow(target, origin: .focusFollowsMouse)
+            let request = try XCTUnwrap(fixture.controller.intentLedger.activeManagedRequest)
+
+            if isSuperseded {
+                let replacement = addWindow(
+                    pid: 820_132, windowId: 820_232, to: fixture.workspaceId, controller: fixture.controller
+                )
+                fixture.controller.focusWindow(replacement)
+            } else {
+                _ = fixture.controller.cancelManagedFocusRequest(request)
+            }
+
+            let entry = try XCTUnwrap(fixture.controller.workspaceManager.entry(for: target))
+            fixture.controller.axEventHandler.handleManagedAppActivation(
+                entry: entry,
+                isWorkspaceActive: true,
+                appFullscreen: false,
+                source: .focusedWindowChanged,
+                activeRequestId: request.requestId
+            )
+
+            XCTAssertFalse(
+                fixture.recorder.operations.contains(.order(UInt32(floating.windowId))),
+                "isSuperseded=\(isSuperseded)"
+            )
         }
     }
 
@@ -1790,6 +2004,11 @@ final class FocusWithoutRaiseTests: XCTestCase {
                     recorder.coverageQueries.append((windowId, candidates))
                     return recorder.coverage
                 },
+                overlappingWindowIdsAbove: { windowId, candidates in
+                    recorder.stackQueries.append((windowId, candidates))
+                    return recorder.overlappingWindowIdsAbove
+                },
+                isWindowOrderedIn: { recorder.orderedInByWindowId[$0] ?? true },
                 enqueueRetryRaise: { _, _, job, completion in
                     guard recorder.workerAvailable else { return false }
                     recorder.queuedRaises.append((job, completion))

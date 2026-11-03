@@ -30,6 +30,11 @@ let package = Package(
         .package(url: "https://github.com/mattt/swift-toml.git", from: "2.0.0")
     ],
     targets: [
+        .target(
+            name: "PersonalDashboardKit",
+            path: "dashboard/Sources/PersonalWMDashboard",
+            exclude: ["DashboardApp.swift"]
+        ),
         .binaryTarget(
             name: "GhosttyKit",
             path: "Frameworks/GhosttyKit.xcframework"
@@ -119,6 +124,7 @@ let package = Package(
         .target(
             name: "OmniWM",
             dependencies: [
+                "PersonalDashboardKit",
                 "GhosttyKit",
                 "OmniWMIPC",
                 "OmniWMAudioTap",

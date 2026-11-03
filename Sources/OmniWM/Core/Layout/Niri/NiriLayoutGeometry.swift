@@ -123,7 +123,8 @@ struct NiriLayoutViewport {
                 viewportFrame: area.workingFrame,
                 orientation: orientation,
                 hiddenPlacementMonitor: hiddenPlacementMonitor,
-                hiddenPlacementMonitors: hiddenPlacementMonitors
+                hiddenPlacementMonitors: hiddenPlacementMonitors,
+                unclampedRect: visibilityRect
             ) {
                 visibilityState = .hidden(liveOverflowEdge)
             }

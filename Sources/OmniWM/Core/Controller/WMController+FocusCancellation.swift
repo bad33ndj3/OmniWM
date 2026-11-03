@@ -40,6 +40,9 @@ extension WMController {
         else {
             return nil
         }
+        if focusFollowsMouseFloatingStack?.requestId == request.requestId {
+            focusFollowsMouseFloatingStack = nil
+        }
         _ = workspaceManager.cancelManagedFocusRequest(
             matching: canceledRequest.token,
             workspaceId: canceledRequest.workspaceId,

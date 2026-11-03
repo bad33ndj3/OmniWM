@@ -62,6 +62,8 @@ final class IPCCommandRouter {
             return controller.commandHandler.performCommand(.openMenuAnywhere)
         case let .shellAppOpen(appID):
             return controller.commandHandler.performCommand(.shellAppOpen(appID))
+        case .openPersonalDashboard:
+            return controller.commandHandler.performCommand(.openPersonalDashboard)
         }
     }
 

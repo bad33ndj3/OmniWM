@@ -1704,6 +1704,17 @@
         }
       }
     },
+    "command.dashboard.open" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Open Workspace Dashboard"
+          }
+        }
+      }
+    },
     "command.dwindle.clearPreselection" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {

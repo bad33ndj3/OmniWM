@@ -6,6 +6,7 @@ import Darwin
 import Foundation
 
 enum FocusPolicyLeaseOwner: String, Equatable {
+    case personalDashboard = "personal_dashboard"
     case foreignTransientUI = "foreign_transient_ui"
     case nativeMenu = "native_menu"
     case statusPanel = "status_panel"
@@ -45,6 +46,7 @@ struct FocusPolicyDecision: Equatable {
 @MainActor
 final class FocusPolicyEngine {
     private static let effectiveLeasePriority: [FocusPolicyLeaseOwner] = [
+        .personalDashboard,
         .foreignTransientUI,
         .nativeMenu,
         .statusPanel,
