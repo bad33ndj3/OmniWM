@@ -1,6 +1,21 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "A translucent window map in the top-right corner. Click a window to reveal it." : {
+
+    },
+    "Focus and reveal this window" : {
+
+    },
+    "Minimap" : {
+
+    },
+    "While Navigating" : {
+
+    },
+    "Workspace minimap" : {
+
+    },
     "Could Not Install Update" : {
 
     },
